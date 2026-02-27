@@ -1,6 +1,12 @@
 # AI 駆動開発スターターキット
 
-このリポジトリは Python による AI 駆動開発のための最小限のスターターキットを提供します。含まれているもの：
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**Python による AI 駆動開発のための最小限・再利用可能なスターターキット**
+
+このリポジトリは、AI プロジェクトをすぐに始めたい開発者向けに、基本的なプロジェクト構成、テンプレート化機構、CI/CD パイプラインを提供します。
+
+## 含まれているもの
 
 - 基本的なプロジェクト構成
 - AI モデル（OpenAI SDK）を読み込み・利用するサンプルコード
@@ -93,3 +99,7 @@ pip install -r requirements.txt
 ドキュメントサイトは `docs/index.html` にあり、リポジトリの Pages を有効にしてソースに `docs/` を指定すると GitHub Pages で公開できます。このページにはセットアップ、実行、テスト、テンプレートの使い方が説明されています。
 
 サイトは `main` ブランチへのプッシュごとに README や他の Markdown ソースから自動再生成されるため、スターターキットの最新状態を常に反映します。
+
+## ライセンス
+
+このプロジェクトは MIT ライセンス下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
