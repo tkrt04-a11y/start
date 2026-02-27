@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Driven Development Starter Kit</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 2rem; line-height: 1.6; }
+        h1,h2,h3 { color: #333; }
+        pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; }
+        code { background: #f5f5f5; padding: 0.2rem 0.4rem; }
+    </style>
+</head>
+<body>
+<h1>AI 駆動開発スターターキット</h1>
+<p>このリポジトリは Python による AI 駆動開発のための最小限のスターターキットを提供します。含まれているもの：</p>
+<ul>
+<li>基本的なプロジェクト構成</li>
+<li>AI モデル（OpenAI SDK）を読み込み・利用するサンプルコード</li>
+<li>シンプルな CLI エントリポイント</li>
+<li>ユニットテスト</li>
+<li>開発ガイドライン</li>
+</ul>
+<h2>セットアップ</h2>
+<ol>
+<li>Python の仮想環境を作成・有効化：
+   <code>sh
+   python -m venv venv
+   .\venv\Scripts\activate</code></li>
+<li>依存関係をインストール：
+   <code>sh
+   pip install -r requirements.txt</code></li>
+</ol>
+<h2>使い方</h2>
+<p>メインスクリプトを実行：</p>
+<pre><code class="language-sh">python -m src.main
+</code></pre>
+<h2>テスト</h2>
+<pre><code class="language-sh">pytest
+</code></pre>
+<h2>注意事項</h2>
+<ul>
+<li>必要な AI ライブラリ（例: openai、transformers）を <code>requirements.txt</code> に追加してください。</li>
+<li>環境変数（API キーなど）を適切に設定してください。</li>
+</ul>
+<h2>Cookiecutter テンプレート</h2>
+<p><code>cookiecutter-ai-starter/</code> にカスタマイズ可能なテンプレートが含まれています。これを使えば、自分のプロジェクト名や設定でスターターキットの新しいコピーをすばやく作成できます。</p>
+<h3>1. インストール</h3>
+<pre><code class="language-sh">pip install cookiecutter        # まだインストールしていない場合
+</code></pre>
+<h3>2. テンプレートから生成</h3>
+<pre><code class="language-sh">cookiecutter d:\GitHub\start\cookiecutter-ai-starter
+</code></pre>
+<p>実行すると対話形式で以下のように質問されます（括弧内はデフォルト値）：</p>
+<pre><code>project_name [AI Starter Project]: My Awesome App
+project_slug [ai_starter]: awesome_app
+description [A minimal AI-driven development project]: An app that uses AI
+python_version [3.11]: 3.11
+</code></pre>
+<p>入力が完了すると、現在のディレクトリに <code>awesome_app</code> というフォルダが作成され、その中にスターターキットのファイルがコピーされます。プロジェクト名やスラッグは <code>cookiecutter.json</code> 内で定義されている変数です。</p>
+<h3>3. 生成後の手順</h3>
+<pre><code class="language-sh">cd awesome_app
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+</code></pre>
+<p>以降は通常のセットアップ・実行・テスト手順に従います。</p>
+<h3>4. テンプレートのカスタマイズ</h3>
+<ul>
+<li><code>cookiecutter.json</code> に要素を追加すると、新たな質問が発生します。</li>
+<li>テンプレート内のファイル名や内容で <code>{{cookiecutter.&lt;name&gt;}}</code> を利用すれば動的に置換されます。</li>
+<li>たとえば、<code>{{cookiecutter.project_slug}}/src/{{cookiecutter.project_slug}}.py</code> のように書けます。</li>
+</ul>
+<p>これにより、プロジェクト固有の情報をテンプレート化できます。</p>
+<hr />
+<p>（このセクションはドキュメントに自動的に反映され、サイトにも詳細な説明が出力されます。）</p>
+<h2>ウェブサイト</h2>
+<p>ドキュメントサイトは <code>docs/index.html</code> にあり、リポジトリの Pages を有効にしてソースに <code>docs/</code> を指定すると GitHub Pages で公開できます。このページにはセットアップ、実行、テスト、テンプレートの使い方が説明されています。</p>
+<p>サイトは <code>main</code> ブランチへのプッシュごとに README や他の Markdown ソースから自動再生成されるため、スターターキットの最新状態を常に反映します。</p>
+</body>
+</html>
