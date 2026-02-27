@@ -77,6 +77,19 @@ pip install -r requirements.txt
 <p>これにより、プロジェクト固有の情報をテンプレート化できます。</p>
 <hr />
 <p>（このセクションはドキュメントに自動的に反映され、サイトにも詳細な説明が出力されます。）</p>
+<h2>Copilot / ChatGPT 向け指示</h2>
+<p>このスターターキットは GitHub Copilot や ChatGPT のチャット機能で
+“リポジトリの前提”を与えるためのサンプル指示ファイルを含みます。</p>
+<p>指示は <code>.github/instructions/common.instructions.md</code> に置いてあります。</p>
+<p>ファイル内では</p>
+<pre><code class="language-yaml">---
+description: リポジトリ全体の共通ガイドラインを Copilot Chat に提供します。
+applyTo: &quot;**/*&quot;
+---
+</code></pre>
+<p>のようにメタデータを記載でき、実際の指示を Markdown 形式で続けます。</p>
+<p>詳細は Qiita 記事『Github Copilotを標準機能の範囲で賢くしよう』を参考に
+必要に応じてファイルを追加・編集してください。</p>
 <h2>ウェブサイト</h2>
 <p>ドキュメントサイトは <code>docs/index.html</code> にあり、リポジトリの Pages を有効にしてソースに <code>docs/</code> を指定すると GitHub Pages で公開できます。このページにはセットアップ、実行、テスト、テンプレートの使い方が説明されています。</p>
 <p>サイトは <code>main</code> ブランチへのプッシュごとに README や他の Markdown ソースから自動再生成されるため、スターターキットの最新状態を常に反映します。</p>

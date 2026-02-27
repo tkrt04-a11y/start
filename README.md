@@ -94,6 +94,25 @@ pip install -r requirements.txt
 
 （このセクションはドキュメントに自動的に反映され、サイトにも詳細な説明が出力されます。）
 
+## Copilot / ChatGPT 向け指示
+
+このスターターキットは GitHub Copilot や ChatGPT のチャット機能で
+“リポジトリの前提”を与えるためのサンプル指示ファイルを含みます。
+
+指示は `.github/instructions/common.instructions.md` に置いてあります。
+
+ファイル内では
+```yaml
+---
+description: リポジトリ全体の共通ガイドラインを Copilot Chat に提供します。
+applyTo: "**/*"
+---
+```
+のようにメタデータを記載でき、実際の指示を Markdown 形式で続けます。
+
+詳細は Qiita 記事『Github Copilotを標準機能の範囲で賢くしよう』を参考に
+必要に応じてファイルを追加・編集してください。
+
 ## ウェブサイト
 
 ドキュメントサイトは `docs/index.html` にあり、リポジトリの Pages を有効にしてソースに `docs/` を指定すると GitHub Pages で公開できます。このページにはセットアップ、実行、テスト、テンプレートの使い方が説明されています。
