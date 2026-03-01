@@ -200,3 +200,41 @@ def test_build_comment_includes_continuous_slo_alert_section_and_comparison():
     assert "| weekly | critical | 5 | 2026-03-01T09:30:00 |" in body
     assert "| continuous_slo_severity | warning | critical | +1 |" in body
     assert "| continuous_slo_breached_pipelines | daily | weekly | +1 (weekly) / -1 (daily) |" in body
+
+
+def test_build_comment_sorts_continuous_violated_pipeline_rows_deterministically():
+    module = _load_metrics_pr_comment_module()
+
+    payload = {
+        "days": 30,
+        "threshold_profile": "prod",
+        "violations": [],
+        "continuous_alert": {
+            "severity": "critical",
+            "active": True,
+            "warning_limit": 3,
+            "critical_limit": 5,
+            "violated_pipelines": [
+                {
+                    "pipeline": "weekly",
+                    "severity": "warning",
+                    "consecutive_failures": 3,
+                    "latest_run": "2026-03-01T08:00:00",
+                },
+                {
+                    "pipeline": "daily",
+                    "severity": "critical",
+                    "consecutive_failures": 5,
+                    "latest_run": "2026-03-01T09:30:00",
+                },
+            ],
+        },
+    }
+
+    body = module.build_comment(payload)
+
+    critical_row = "| daily | critical | 5 | 2026-03-01T09:30:00 |"
+    warning_row = "| weekly | warning | 3 | 2026-03-01T08:00:00 |"
+    assert critical_row in body
+    assert warning_row in body
+    assert body.index(critical_row) < body.index(warning_row)

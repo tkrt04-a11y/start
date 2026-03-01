@@ -718,6 +718,15 @@
 - 完了条件:
   - PRコメント比較表で違反パイプラインの追加/解消を確認できる。
 
+### ISSUE-077: continuous SLO違反テーブルの安定ソート
+- Priority: P2
+- Status: done
+- 背景: violated pipelines の出力順が入力順依存だと、実質同内容でもPRコメント差分ノイズが発生する。
+- 実装方針:
+  - metrics PRコメントの continuous SLO違反テーブルを `severity desc -> pipeline asc` で安定ソートして出力する。
+- 完了条件:
+  - 同一データ集合なら入力順に依存せず同じ行順でPRコメントが生成される。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -796,6 +805,7 @@
 74. ISSUE-074
 75. ISSUE-075
 76. ISSUE-076
+77. ISSUE-077
 
 ---
 
@@ -820,3 +830,4 @@
 - 2026-03-01: ISSUE-068, 069, 070, 071, 072 を実装完了（CIロールバック判断artifact・依存脆弱性差分PR通知・週次失敗Issue自動クローズ・段階的SLOアラート・Dashboard KPIトレンド表示）。
 - 2026-03-01: ISSUE-073, 074, 075 を実装完了（metrics PRコメントへのcontinuous SLO段階表示・severity前回比較・READMEへの段階設定追記）。
 - 2026-03-01: ISSUE-076 を実装完了（metrics PRコメント比較表に continuous SLO違反パイプライン差分を追加）。
+- 2026-03-01: ISSUE-077 を実装完了（continuous SLO違反テーブルの安定ソートでPRコメント差分ノイズを低減）。

@@ -68,6 +68,32 @@ def _extract_continuous_alert(payload: dict[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _to_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _extract_violated_pipeline_rows(continuous_alert: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_pipelines = continuous_alert.get("violated_pipelines", [])
+    if not isinstance(raw_pipelines, list):
+        return []
+    return [item for item in raw_pipelines if isinstance(item, dict)]
+
+
+def _sort_violated_pipeline_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            -_severity_rank(str(row.get("severity", "warning"))),
+            str(row.get("pipeline", "")).strip().lower(),
+            -_to_int(row.get("consecutive_failures", 0)),
+            str(row.get("latest_run", "")).strip(),
+        ),
+    )
+
+
 def _severity_rank(value: str) -> int:
     severity = value.strip().lower()
     if severity == "critical":
@@ -88,14 +114,8 @@ def _format_severity_delta(current: str, previous: str) -> str:
 
 
 def _extract_breached_pipeline_names(continuous_alert: dict[str, Any]) -> list[str]:
-    raw_pipelines = continuous_alert.get("violated_pipelines", [])
-    if not isinstance(raw_pipelines, list):
-        return []
-
     names: set[str] = set()
-    for item in raw_pipelines:
-        if not isinstance(item, dict):
-            continue
+    for item in _extract_violated_pipeline_rows(continuous_alert):
         pipeline = str(item.get("pipeline", "")).strip().lower()
         if pipeline:
             names.add(pipeline)
@@ -186,9 +206,7 @@ def build_comment(
     continuous_active = bool(continuous_alert.get("active", False))
     warning_limit = int(continuous_alert.get("warning_limit", continuous_alert.get("limit", 0)) or 0)
     critical_limit = int(continuous_alert.get("critical_limit", warning_limit) or warning_limit)
-    violated_pipelines = continuous_alert.get("violated_pipelines", [])
-    if not isinstance(violated_pipelines, list):
-        violated_pipelines = []
+    violated_pipelines = _sort_violated_pipeline_rows(_extract_violated_pipeline_rows(continuous_alert))
 
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -229,11 +247,9 @@ def build_comment(
         lines.append("| Pipeline | Severity | Consecutive failures | Latest run |")
         lines.append("|---|---|---:|---|")
         for row in violated_pipelines:
-            if not isinstance(row, dict):
-                continue
             pipeline = str(row.get("pipeline", "unknown"))
             pipeline_severity = str(row.get("severity", "warning"))
-            consecutive_failures = int(row.get("consecutive_failures", 0) or 0)
+            consecutive_failures = _to_int(row.get("consecutive_failures", 0))
             latest_run = str(row.get("latest_run", ""))
             lines.append(f"| {pipeline} | {pipeline_severity} | {consecutive_failures} | {latest_run} |")
     else:
