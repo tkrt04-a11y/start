@@ -53,6 +53,32 @@ def determine_failure_reasons(outcomes: dict[str, str], missing_files: list[str]
     return reasons
 
 
+def build_reproduction_commands(
+    commands: list[str],
+    outcomes: dict[str, str],
+    missing_files: list[str],
+) -> list[str]:
+    reproduction: list[str] = []
+
+    if any(value in {"failure", "cancelled", "timed_out"} for value in outcomes.values()):
+        reproduction.extend(commands)
+    elif commands:
+        reproduction.extend(commands)
+
+    if missing_files:
+        reproduction.append("python scripts/ci/verify_weekly_ops_artifacts.py --json-output logs/weekly-artifact-verify.json")
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for command in reproduction:
+        normalized = command.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique.append(normalized)
+    return unique
+
+
 def collect_latest_log_excerpt(log_dir: Path, max_lines: int) -> str:
     if not log_dir.exists() or not log_dir.is_dir():
         return "No log directory found."
@@ -81,6 +107,7 @@ def collect_latest_log_excerpt(log_dir: Path, max_lines: int) -> str:
 def build_diagnostic_markdown(
     commands: list[str],
     reasons: list[str],
+    reproduction_commands: list[str],
     required_files: list[str],
     missing_files: list[str],
     log_excerpt: str,
@@ -101,6 +128,9 @@ def build_diagnostic_markdown(
         "",
         "## Failure Reasons",
         *[f"- {reason}" for reason in reasons],
+        "",
+        "## Reproduction Commands",
+        *([f"- {command}" for command in reproduction_commands] or ["- (none)"]),
         "",
         "## Required File Verification",
         *required_lines,
@@ -168,12 +198,14 @@ def main() -> int:
     outcomes = parse_outcome_pairs(args.outcomes)
     missing = missing_required_files(required_files, root)
     reasons = determine_failure_reasons(outcomes, missing)
+    reproduction_commands = build_reproduction_commands(commands, outcomes, missing)
     log_excerpt = collect_latest_log_excerpt(root / args.log_dir, args.max_log_lines)
 
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     content = build_diagnostic_markdown(
         commands=commands,
         reasons=reasons,
+        reproduction_commands=reproduction_commands,
         required_files=required_files,
         missing_files=missing,
         log_excerpt=log_excerpt,

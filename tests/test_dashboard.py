@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from src.dashboard import (
+    _build_pipeline_slo_rows,
     _collect_issue_sync_stats,
     _load_daily_alert_summaries_from_logs,
     _parse_ops_report_markdown,
@@ -145,6 +146,10 @@ def test_parse_weekly_failure_diagnostic_markdown_parses_latest_summary() -> Non
             "- Step 'verify_weekly_artifacts' ended with outcome: failure",
             "- Required artifact files are missing: docs/ops_reports/index.html",
             "",
+            "## Reproduction Commands",
+            "- python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json",
+            "- python scripts/ci/verify_weekly_ops_artifacts.py --json-output logs/weekly-artifact-verify.json",
+            "",
             "## Required File Verification",
             "- [OK] docs/ops_reports/latest_ops_report.md",
             "- [MISSING] docs/ops_reports/index.html",
@@ -158,6 +163,10 @@ def test_parse_weekly_failure_diagnostic_markdown_parses_latest_summary() -> Non
         "Step 'verify_weekly_artifacts' ended with outcome: failure",
         "Required artifact files are missing: docs/ops_reports/index.html",
     ]
+    assert parsed.get("reproduction_commands") == [
+        "python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json",
+        "python scripts/ci/verify_weekly_ops_artifacts.py --json-output logs/weekly-artifact-verify.json",
+    ]
     assert parsed.get("required_file_checks") == [
         {"status": "OK", "path": "docs/ops_reports/latest_ops_report.md"},
         {"status": "MISSING", "path": "docs/ops_reports/index.html"},
@@ -166,3 +175,33 @@ def test_parse_weekly_failure_diagnostic_markdown_parses_latest_summary() -> Non
 
 def test_parse_weekly_failure_diagnostic_markdown_returns_empty_for_blank() -> None:
     assert _parse_weekly_failure_diagnostic_markdown("\n") == {}
+
+
+def test_build_pipeline_slo_rows_marks_pass_and_fail() -> None:
+    summary = {
+        "pipelines": {
+            "daily": {"runs": 4, "success_rate": 0.98},
+            "weekly": {"runs": 2, "success_rate": 0.80},
+        }
+    }
+
+    rows = _build_pipeline_slo_rows(summary, targets={"daily": 95.0, "weekly": 90.0})
+
+    assert rows == [
+        {
+            "pipeline": "日次",
+            "runs": 4,
+            "slo_target(%)": 95.0,
+            "observed_success(%)": 98.0,
+            "gap(%)": 3.0,
+            "status": "PASS",
+        },
+        {
+            "pipeline": "週次",
+            "runs": 2,
+            "slo_target(%)": 90.0,
+            "observed_success(%)": 80.0,
+            "gap(%)": -10.0,
+            "status": "FAIL",
+        },
+    ]

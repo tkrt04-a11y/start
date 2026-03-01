@@ -545,6 +545,52 @@
 - 完了条件:
   - `artifact_integrity` 情報を ops-report(json/md/html) と Dashboard で確認できる。
 
+### ISSUE-058: CIにシークレット自動検査を追加
+- Priority: P0
+- Status: done
+- 背景: push/PR時のシークレット混入をCI段階で早期検知したい。
+- 実装方針:
+  - 追跡ファイルを対象にシークレットパターン検査スクリプトを追加し、CIで実行する。
+  - プレースホルダ値はallowlistで誤検知を回避する。
+- 完了条件:
+  - CIでsecret scanが実行され、検知時はジョブ失敗となる。
+
+### ISSUE-059: Workflow権限の最小化
+- Priority: P0
+- Status: done
+- 背景:不要な権限付与は事故時の影響範囲を広げる。
+- 実装方針:
+  - workflow全体は `contents: read` を基本とし、必要なjobのみ job-level でwrite権限を付与する。
+- 完了条件:
+  - python-app / weekly-ops-report の権限が最小化される。
+
+### ISSUE-060: Release作成の半自動化
+- Priority: P1
+- Status: done
+- 背景: 手動リリース作成の入力ミス・手順ブレを減らしたい。
+- 実装方針:
+  - `workflow_dispatch` でタグ/タイトル/notes file を受け取る release workflow を追加する。
+- 完了条件:
+  - 手動トリガーでReleaseを作成できるworkflowが root/template に存在する。
+
+### ISSUE-061: 失敗診断artifactへ再現コマンドセット付与
+- Priority: P1
+- Status: done
+- 背景: 失敗時の初動を短縮するため、再現手順をartifact内に明示したい。
+- 実装方針:
+  - weekly failure diagnostic に `Reproduction Commands` セクションを追加する。
+- 完了条件:
+  - 診断artifactとDashboardで再現コマンドを確認できる。
+
+### ISSUE-062: Dashboardに運用SLOビュー追加
+- Priority: P2
+- Status: done
+- 背景: 成功率の目標達成状況を運用UIで即時把握したい。
+- 実装方針:
+  - パイプライン別の目標成功率(SLO)と実績を比較し、PASS/FAILを表示する。
+- 完了条件:
+  - Metrics タブにSLO表と未達警告が表示される。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -604,6 +650,11 @@
 55. ISSUE-055
 56. ISSUE-056
 57. ISSUE-057
+58. ISSUE-058
+59. ISSUE-059
+60. ISSUE-060
+61. ISSUE-061
+62. ISSUE-062
 
 ---
 
@@ -623,3 +674,4 @@
 - 2026-03-01: ISSUE-043, 044, 045, 046, 047 を実装完了（JSONスキーマ固定化・Dashboard日次要約表示・再実行ガイド自動化・Issue Sync再試行強化・artifact完全性チェック）。
 - 2026-03-01: ISSUE-048, 049, 050, 051, 052 を実装完了（runbookアンカー化・PR差分コメント・Issue Sync監視カード・失敗診断artifact・スキーマ互換性ポリシー文書化）。
 - 2026-03-01: ISSUE-053, 054, 055, 056, 057 を実装完了（retry環境変数化・診断要約Dashboard表示・schema version互換検証・PR再実行ガイド併記・artifact完全性結果のops取込）。
+- 2026-03-01: ISSUE-058, 059, 060, 061, 062 を実装完了（CI secret scan追加・workflow権限最小化・Release workflow追加・診断artifact再現コマンド追加・Dashboard SLO表示）。

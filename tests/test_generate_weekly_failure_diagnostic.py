@@ -78,6 +78,7 @@ def test_build_diagnostic_markdown_contains_all_required_sections():
     report = module.build_diagnostic_markdown(
         commands=["python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json"],
         reasons=["Step 'verify_weekly_artifacts' ended with outcome: failure"],
+        reproduction_commands=["python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json"],
         required_files=["docs/ops_reports/index.html"],
         missing_files=["docs/ops_reports/index.html"],
         log_excerpt="File: logs/weekly-run.log\n\nERROR sample",
@@ -86,6 +87,20 @@ def test_build_diagnostic_markdown_contains_all_required_sections():
 
     assert "## Executed Commands" in report
     assert "## Failure Reasons" in report
+    assert "## Reproduction Commands" in report
     assert "## Required File Verification" in report
     assert "## Latest Log Excerpt" in report
     assert "[MISSING] docs/ops_reports/index.html" in report
+
+
+def test_build_reproduction_commands_includes_verify_when_missing_files():
+    module = _load_module()
+
+    commands = ["python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json"]
+    outcomes = {"verify_weekly_artifacts": "failure"}
+    missing_files = ["docs/ops_reports/index.html"]
+
+    reproduction = module.build_reproduction_commands(commands, outcomes, missing_files)
+
+    assert commands[0] in reproduction
+    assert "python scripts/ci/verify_weekly_ops_artifacts.py --json-output logs/weekly-artifact-verify.json" in reproduction

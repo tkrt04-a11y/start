@@ -36,6 +36,12 @@ PIPELINE_LABELS = {
     "unknown": "不明",
 }
 
+SLO_DEFAULT_TARGETS = {
+    "daily": 95.0,
+    "weekly": 90.0,
+    "monthly": 90.0,
+}
+
 
 def _safe_read_text(path: Path) -> str:
     try:
@@ -152,6 +158,7 @@ def _parse_weekly_failure_diagnostic_markdown(text: str) -> dict[str, object]:
     parsed: dict[str, object] = {
         "generated_at": "",
         "failure_reasons": [],
+        "reproduction_commands": [],
         "required_file_checks": [],
     }
 
@@ -170,6 +177,12 @@ def _parse_weekly_failure_diagnostic_markdown(text: str) -> dict[str, object]:
             reasons = parsed["failure_reasons"]
             if isinstance(reasons, list):
                 reasons.append(line[2:].strip())
+            continue
+
+        if current_section == "## Reproduction Commands" and line.startswith("- "):
+            commands = parsed["reproduction_commands"]
+            if isinstance(commands, list):
+                commands.append(line[2:].strip())
             continue
 
         if current_section == "## Required File Verification" and line.startswith("- "):
@@ -222,6 +235,36 @@ def _safe_int(value: object) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _build_pipeline_slo_rows(
+    summary: dict[str, object],
+    targets: dict[str, float] | None = None,
+) -> list[dict[str, object]]:
+    resolved_targets = targets or SLO_DEFAULT_TARGETS
+    pipelines = summary.get("pipelines", {}) if isinstance(summary.get("pipelines"), dict) else {}
+    rows: list[dict[str, object]] = []
+
+    for pipeline_name in sorted(pipelines.keys()):
+        pipeline_payload = pipelines.get(pipeline_name, {})
+        if not isinstance(pipeline_payload, dict):
+            continue
+
+        runs = _safe_int(pipeline_payload.get("runs", 0))
+        observed = float(pipeline_payload.get("success_rate", 0.0)) * 100.0
+        target = float(resolved_targets.get(pipeline_name, 90.0))
+        gap = observed - target
+        rows.append(
+            {
+                "pipeline": PIPELINE_LABELS.get(pipeline_name, pipeline_name),
+                "runs": runs,
+                "slo_target(%)": round(target, 1),
+                "observed_success(%)": round(observed, 1),
+                "gap(%)": round(gap, 1),
+                "status": "PASS" if observed >= target else "FAIL",
+            }
+        )
+    return rows
 
 
 def _read_recent_jsonl_records(path: Path, limit: int = 2000) -> list[dict[str, object]]:
@@ -639,6 +682,13 @@ def main() -> None:
             else:
                 st.info("失敗理由の記載がありません")
 
+            reproduction_commands = failure_summary.get("reproduction_commands", [])
+            if isinstance(reproduction_commands, list) and reproduction_commands:
+                st.write("#### 再現コマンド")
+                st.table([{"command": str(command)} for command in reproduction_commands])
+            else:
+                st.info("再現コマンドの記載がありません")
+
             required_checks = failure_summary.get("required_file_checks", [])
             if isinstance(required_checks, list) and required_checks:
                 st.write("#### 必須ファイル検証（要点）")
@@ -691,6 +741,19 @@ def main() -> None:
             st.bar_chart(run_counts, use_container_width=True)
             st.write("### 成功率（%）")
             st.bar_chart(success_rates, use_container_width=True)
+
+            st.write("### SLO（成功率目標）")
+            slo_rows = _build_pipeline_slo_rows(summary)
+            if slo_rows:
+                st.table(slo_rows)
+                failed_rows = [row for row in slo_rows if str(row.get("status")) == "FAIL"]
+                if failed_rows:
+                    st.warning(
+                        "SLO未達: "
+                        + ", ".join(str(row.get("pipeline", "")) for row in failed_rows)
+                    )
+                else:
+                    st.success("全パイプラインでSLOを達成しています")
 
         st.write("### 最近のしきい値違反")
         violations = threshold_check.get("violations", []) if isinstance(threshold_check.get("violations"), list) else []
