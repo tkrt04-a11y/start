@@ -709,6 +709,15 @@
 - 完了条件:
   - READMEだけで段階的SLO設定の方法が把握できる。
 
+### ISSUE-076: continuous SLO違反パイプライン差分の可視化
+- Priority: P2
+- Status: done
+- 背景: severity比較だけでは、どのパイプラインで連続SLO違反が増減したか判断しづらい。
+- 実装方針:
+  - metrics PRコメント比較表へ `continuous_slo_breached_pipelines` 行を追加し、前回比の追加/解消を表示する。
+- 完了条件:
+  - PRコメント比較表で違反パイプラインの追加/解消を確認できる。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -786,6 +795,7 @@
 73. ISSUE-073
 74. ISSUE-074
 75. ISSUE-075
+76. ISSUE-076
 
 ---
 
@@ -809,3 +819,4 @@
 - 2026-03-01: ISSUE-063, 064, 065, 066, 067 を実装完了（依存脆弱性スキャンCI統合・release前提チェック・weekly失敗時Issue自動起票・連続SLO違反通知・Dashboard Release/CI健全性表示）。
 - 2026-03-01: ISSUE-068, 069, 070, 071, 072 を実装完了（CIロールバック判断artifact・依存脆弱性差分PR通知・週次失敗Issue自動クローズ・段階的SLOアラート・Dashboard KPIトレンド表示）。
 - 2026-03-01: ISSUE-073, 074, 075 を実装完了（metrics PRコメントへのcontinuous SLO段階表示・severity前回比較・READMEへの段階設定追記）。
+- 2026-03-01: ISSUE-076 を実装完了（metrics PRコメント比較表に continuous SLO違反パイプライン差分を追加）。

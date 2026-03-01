@@ -87,6 +87,37 @@ def _format_severity_delta(current: str, previous: str) -> str:
     return f"{sign}{delta}"
 
 
+def _extract_breached_pipeline_names(continuous_alert: dict[str, Any]) -> list[str]:
+    raw_pipelines = continuous_alert.get("violated_pipelines", [])
+    if not isinstance(raw_pipelines, list):
+        return []
+
+    names: set[str] = set()
+    for item in raw_pipelines:
+        if not isinstance(item, dict):
+            continue
+        pipeline = str(item.get("pipeline", "")).strip().lower()
+        if pipeline:
+            names.add(pipeline)
+    return sorted(names)
+
+
+def _format_pipeline_set_delta(current: list[str], previous: list[str]) -> str:
+    current_set = set(current)
+    previous_set = set(previous)
+    added = sorted(current_set - previous_set)
+    resolved = sorted(previous_set - current_set)
+    if not added and not resolved:
+        return "0"
+
+    chunks: list[str] = []
+    if added:
+        chunks.append(f"+{len(added)} ({', '.join(added)})")
+    if resolved:
+        chunks.append(f"-{len(resolved)} ({', '.join(resolved)})")
+    return " / ".join(chunks)
+
+
 def _count_violations_by_pipeline(violations: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {pipeline: 0 for pipeline in _PIPELINES}
     for item in violations:
@@ -218,6 +249,8 @@ def build_comment(
         previous_health_score = _extract_health_score(previous_payload)
         previous_continuous = _extract_continuous_alert(previous_payload)
         previous_continuous_severity = str(previous_continuous.get("severity", "none")).strip().lower()
+        current_breached_pipelines = _extract_breached_pipeline_names(continuous_alert)
+        previous_breached_pipelines = _extract_breached_pipeline_names(previous_continuous)
         current_pipeline_counts = _count_violations_by_pipeline(violations)
         previous_pipeline_counts = _count_violations_by_pipeline(previous_violations)
 
@@ -238,6 +271,12 @@ def build_comment(
             "| continuous_slo_severity | "
             f"{previous_continuous_severity} | {continuous_severity} | "
             f"{_format_severity_delta(continuous_severity, previous_continuous_severity)} |"
+        )
+        lines.append(
+            "| continuous_slo_breached_pipelines | "
+            f"{', '.join(previous_breached_pipelines) if previous_breached_pipelines else '(none)'} | "
+            f"{', '.join(current_breached_pipelines) if current_breached_pipelines else '(none)'} | "
+            f"{_format_pipeline_set_delta(current_breached_pipelines, previous_breached_pipelines)} |"
         )
         for pipeline in _PIPELINES:
             current_count = current_pipeline_counts.get(pipeline, 0)

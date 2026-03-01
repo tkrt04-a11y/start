@@ -181,7 +181,14 @@ def test_build_comment_includes_continuous_slo_alert_section_and_comparison():
             "active": True,
             "warning_limit": 3,
             "critical_limit": 5,
-            "violated_pipelines": [],
+            "violated_pipelines": [
+                {
+                    "pipeline": "daily",
+                    "severity": "warning",
+                    "consecutive_failures": 3,
+                    "latest_run": "2026-03-01T08:00:00",
+                }
+            ],
         },
     }
 
@@ -192,3 +199,4 @@ def test_build_comment_includes_continuous_slo_alert_section_and_comparison():
     assert "| Pipeline | Severity | Consecutive failures | Latest run |" in body
     assert "| weekly | critical | 5 | 2026-03-01T09:30:00 |" in body
     assert "| continuous_slo_severity | warning | critical | +1 |" in body
+    assert "| continuous_slo_breached_pipelines | daily | weekly | +1 (weekly) / -1 (daily) |" in body
