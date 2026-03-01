@@ -67,6 +67,57 @@ powershell -ExecutionPolicy Bypass -File scripts/set_openai_key.ps1 -Machine
 python -m src.main
 ```
 
+### CLI クイックスタート（コマンド別）
+
+#### 基本実行
+
+```sh
+python -m src.main
+python -m src.main --help
+```
+
+#### 収集・分析
+
+```sh
+python -m src.main collect
+python -m src.main analyze --ai --model gpt-4o-mini
+python -m src.main fetch github microsoft/vscode open 20
+```
+
+#### 反映・保守
+
+```sh
+python -m src.main apply-insights --dry-run
+python -m src.main retention
+```
+
+#### 品質チェック
+
+```sh
+python -m src.main doctor --json
+python -m src.main metrics-check --days 30 --json
+```
+
+#### レポート
+
+```sh
+python -m src.main weekly-report --days 14
+python -m src.main ops-report --days 7
+```
+
+### Custom Agent 運用
+
+このリポジトリでは、オーケストレーター + サブエージェントの順次実行で改善を進められます。
+
+- 運用ルール: `docs/custom_agent_operations.md`
+- 提案・選定ボード: `docs/custom_agent_task_board.md`
+
+日々の進め方:
+
+1. ボード上の proposed から実施対象を選定
+2. 調査 → 実装 → 検証を順次実行
+3. 結果を issue roadmap とコミットで反映
+
 ### 情報収集機能
 
 AI 駆動開発に有益な情報を手動で記録するための簡単なコマンドを

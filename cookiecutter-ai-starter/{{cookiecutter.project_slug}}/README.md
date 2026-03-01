@@ -29,6 +29,44 @@ Run the main script:
 python -m src.main
 ```
 
+### CLI Quickstart by command
+
+#### Basic run
+
+```sh
+python -m src.main
+python -m src.main --help
+```
+
+#### Collect and analyze
+
+```sh
+python -m src.main collect
+python -m src.main analyze --ai --model gpt-4o-mini
+python -m src.main fetch github microsoft/vscode open 20
+```
+
+#### Apply and maintain
+
+```sh
+python -m src.main apply-insights --dry-run
+python -m src.main retention
+```
+
+#### Quality checks
+
+```sh
+python -m src.main doctor --json
+python -m src.main metrics-check --days 30 --json
+```
+
+#### Reports
+
+```sh
+python -m src.main weekly-report --days 14
+python -m src.main ops-report --days 7
+```
+
 ### Information collection
 
 A simple helper is included to gather notes or ideas you want the

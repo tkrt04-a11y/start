@@ -175,16 +175,29 @@ def _extract_retry_guides(ops_report_payload: dict[str, Any] | None) -> list[dic
         pipeline = str(item.get("pipeline", "")).strip()
         suggested_retry_command = str(item.get("suggested_retry_command", "")).strip()
         runbook_reference = str(item.get("runbook_reference", "")).strip()
-        if not pipeline and not suggested_retry_command and not runbook_reference:
+        runbook_reference_anchor = str(item.get("runbook_reference_anchor", "")).strip()
+        if not runbook_reference_anchor and "#" in runbook_reference:
+            runbook_reference_anchor = "#" + runbook_reference.split("#", 1)[1]
+        if not pipeline and not suggested_retry_command and not runbook_reference and not runbook_reference_anchor:
             continue
         guides.append(
             {
                 "pipeline": pipeline or "n/a",
                 "suggested_retry_command": suggested_retry_command or "n/a",
                 "runbook_reference": runbook_reference or "n/a",
+                "runbook_reference_anchor": runbook_reference_anchor or "n/a",
             }
         )
     return guides
+
+
+def _extract_anchor_summary(retry_guides: list[dict[str, str]]) -> list[str]:
+    anchors: set[str] = set()
+    for guide in retry_guides:
+        anchor = str(guide.get("runbook_reference_anchor", "")).strip()
+        if anchor and anchor != "n/a":
+            anchors.add(anchor)
+    return sorted(anchors)
 
 
 def _as_markdown_link_or_text(value: str) -> str:
@@ -316,6 +329,14 @@ def build_comment(
             suggested_retry_command = guide["suggested_retry_command"]
             runbook_reference = _as_markdown_link_or_text(guide["runbook_reference"])
             lines.append(f"| {pipeline} | {suggested_retry_command} | {runbook_reference} |")
+
+        lines.append("")
+        lines.append("#### Runbook anchor summary")
+        anchors = _extract_anchor_summary(retry_guides)
+        if anchors:
+            lines.append(f"- Anchors: {', '.join(anchors)}")
+        else:
+            lines.append("- Runbook anchor summary unavailable.")
     else:
         lines.append(
             "- Retry guide unavailable: `failed_command_retry_guides` was not found or was empty in `logs/ops-report-ci.json`."

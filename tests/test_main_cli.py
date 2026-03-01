@@ -308,6 +308,7 @@ def test_handle_metrics_check_json_includes_threshold_profile(monkeypatch, capsy
     assert has_violations is False
     assert payload["threshold_profile"] == "stg"
     assert payload["continuous_alert"]["severity"] == "none"
+    assert "next_actions" not in payload
 
 
 def test_handle_metrics_check_text_includes_threshold_profile(monkeypatch, capsys):
@@ -375,6 +376,69 @@ def test_handle_metrics_check_returns_true_on_critical_continuous_alert(monkeypa
     has_violations = main_module.handle_metrics_check([])
 
     assert has_violations is True
+
+
+def test_handle_metrics_check_text_shows_next_actions_on_threshold_violation(monkeypatch, capsys):
+    from src import main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "check_metric_thresholds",
+        lambda days=30: {
+            "threshold_profile": "prod",
+            "violations": [
+                {
+                    "pipeline": "daily",
+                    "metric": "failure_rate",
+                    "threshold": 0.1,
+                    "observed": 0.3,
+                }
+            ],
+            "continuous_alert": {
+                "limit": 3,
+                "warning_limit": 3,
+                "critical_limit": 5,
+                "severity": "warning",
+                "active": True,
+                "violated_pipelines": [],
+            },
+        },
+    )
+
+    has_violations = main_module.handle_metrics_check(["--days", "30"])
+    captured = capsys.readouterr()
+
+    assert has_violations is True
+    assert "Next actions:" in captured.out
+    assert "metrics-check --days 30 --json" in captured.out
+    assert "docs/runbook.md" in captured.out
+
+
+def test_handle_metrics_check_text_shows_critical_slo_action_guidance(monkeypatch, capsys):
+    from src import main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "check_metric_thresholds",
+        lambda days=30: {
+            "threshold_profile": "prod",
+            "violations": [],
+            "continuous_alert": {
+                "limit": 3,
+                "warning_limit": 3,
+                "critical_limit": 5,
+                "severity": "critical",
+                "active": True,
+                "violated_pipelines": [],
+            },
+        },
+    )
+
+    has_violations = main_module.handle_metrics_check([])
+    captured = capsys.readouterr()
+
+    assert has_violations is True
+    assert "Continuous SLO is critical" in captured.out
 
 
 def test_main_ops_report_dispatch(monkeypatch, capsys):

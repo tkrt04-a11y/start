@@ -736,6 +736,44 @@
 - 完了条件:
   - 未知コマンド時に明示エラーメッセージが表示され、API キー有無に依存しない。 
 
+### ISSUE-079: metrics-check 失敗時の次アクション表示強化
+- Priority: P2
+- Status: done
+- 背景: metrics-check 失敗時に次の調査/復旧アクションが出力されず、初動が遅れやすい。
+- 実装方針:
+  - text 出力時のみ `Next actions` を表示し、JSON再実行コマンドと runbook 参照を提示する。
+  - continuous SLO が critical の場合は優先対応ガイダンスを追加する。
+- 完了条件:
+  - 閾値違反または critical 時に、次アクションが CLI 出力へ表示される。
+
+### ISSUE-080: metrics PRコメントに runbook アンカー要約追加
+- Priority: P2
+- Status: done
+- 背景: PRコメントに runbook リンクはあるが、参照すべきアンカーが一覧化されておらず把握しづらい。
+- 実装方針:
+  - retry guide セクションに `Runbook anchor summary` を追加し、アンカーを重複排除して表示する。
+  - `runbook_reference_anchor` がない場合は `runbook_reference` からフォールバック抽出する。
+- 完了条件:
+  - metrics PRコメントで runbook アンカー要約を確認できる。
+
+### ISSUE-081: パイプライン共通パラメータ整合チェック
+- Priority: P1
+- Status: done
+- 背景: daily/weekly/monthly で共通利用する環境変数の不整合が実行時まで検知されない。
+- 実装方針:
+  - doctor に共通パラメータ検証（retry/backoff/cooldown/webhook format/max wait）を追加する。
+- 完了条件:
+  - doctor 実行で共通パラメータ不整合を errors/warnings として検出できる。
+
+### ISSUE-082: README の CLIクイックスタート再編
+- Priority: P2
+- Status: done
+- 背景: README の導入導線が機能説明中心で、よく使う CLI コマンドが探しづらい。
+- 実装方針:
+  - 使い方冒頭にコマンド別クイックスタートを追加し、基本操作を即参照可能にする。
+- 完了条件:
+  - README で主要 CLI コマンドをカテゴリ別にすぐ確認できる。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -816,6 +854,10 @@
 76. ISSUE-076
 77. ISSUE-077
 78. ISSUE-078
+79. ISSUE-079
+80. ISSUE-080
+81. ISSUE-081
+82. ISSUE-082
 
 ---
 
@@ -842,3 +884,4 @@
 - 2026-03-01: ISSUE-076 を実装完了（metrics PRコメント比較表に continuous SLO違反パイプライン差分を追加）。
 - 2026-03-01: ISSUE-077 を実装完了（continuous SLO違反テーブルの安定ソートでPRコメント差分ノイズを低減）。
 - 2026-03-01: ISSUE-078 を実装完了（CLI未知コマンド時の明示エラー表示を追加し、原因特定性を改善）。
+- 2026-03-01: ISSUE-079, 080, 081, 082 を実装完了（metrics-check失敗時の次アクション表示・metrics PRコメントのrunbookアンカー要約・doctor共通パラメータ整合チェック・README CLIクイックスタート再編）。

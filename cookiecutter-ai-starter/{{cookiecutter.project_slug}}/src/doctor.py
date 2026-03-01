@@ -14,6 +14,28 @@ def _fail_on_warnings_enabled() -> bool:
     return _is_truthy(os.getenv("DOCTOR_FAIL_ON_WARNINGS", ""))
 
 
+def _validate_int_min(name: str, default: str, min_value: int, errors: list[str]) -> None:
+    raw = os.getenv(name, default).strip()
+    if not raw:
+        return
+    try:
+        if int(raw) < min_value:
+            errors.append(f"{name} must be >= {min_value}")
+    except ValueError:
+        errors.append(f"{name} must be an integer")
+
+
+def _validate_float_min(name: str, default: str, min_value: float, errors: list[str]) -> None:
+    raw = os.getenv(name, default).strip()
+    if not raw:
+        return
+    try:
+        if float(raw) < min_value:
+            errors.append(f"{name} must be >= {min_value:g}")
+    except ValueError:
+        errors.append(f"{name} must be a number")
+
+
 def run_doctor() -> dict[str, list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -41,21 +63,17 @@ def run_doctor() -> dict[str, list[str]]:
         except ValueError:
             errors.append("ALERTS_MAX_LINES must be an integer")
 
-    retries = os.getenv("CONNECTOR_RETRIES", "3").strip()
-    if retries:
-        try:
-            if int(retries) < 1:
-                errors.append("CONNECTOR_RETRIES must be >= 1")
-        except ValueError:
-            errors.append("CONNECTOR_RETRIES must be an integer")
+    _validate_int_min("CONNECTOR_RETRIES", "3", 1, errors)
+    _validate_float_min("CONNECTOR_BACKOFF_SEC", "0.5", 0, errors)
+    _validate_float_min("CONNECTOR_MAX_WAIT_SEC", "60", 0, errors)
 
-    backoff = os.getenv("CONNECTOR_BACKOFF_SEC", "0.5").strip()
-    if backoff:
-        try:
-            if float(backoff) < 0:
-                errors.append("CONNECTOR_BACKOFF_SEC must be >= 0")
-        except ValueError:
-            errors.append("CONNECTOR_BACKOFF_SEC must be a number")
+    _validate_int_min("ALERT_WEBHOOK_RETRIES", "3", 1, errors)
+    _validate_float_min("ALERT_WEBHOOK_BACKOFF_SEC", "1.0", 0.1, errors)
+    _validate_int_min("ALERT_DEDUP_COOLDOWN_SEC", "600", 0, errors)
+
+    alert_webhook_format = os.getenv("ALERT_WEBHOOK_FORMAT", "generic").strip().lower()
+    if alert_webhook_format and alert_webhook_format not in {"generic", "slack", "teams"}:
+        warnings.append("ALERT_WEBHOOK_FORMAT should be one of: generic, slack, teams")
 
     webhook_url = os.getenv("ALERT_WEBHOOK_URL", "").strip()
     if webhook_url and not (webhook_url.startswith("http://") or webhook_url.startswith("https://")):

@@ -118,11 +118,13 @@ def test_build_comment_includes_runbook_reference_and_retry_guides_from_ops_repo
                 "pipeline": "weekly",
                 "suggested_retry_command": "python -m src.main weekly-report --days 7",
                 "runbook_reference": "docs/runbook.md#週次パイプライン",
+                "runbook_reference_anchor": "#週次パイプライン",
             },
             {
                 "pipeline": "daily",
                 "suggested_retry_command": "python -m src.main retention",
                 "runbook_reference": "docs/runbook.md#日次パイプライン",
+                "runbook_reference_anchor": "#日次パイプライン",
             },
         ]
     }
@@ -133,6 +135,8 @@ def test_build_comment_includes_runbook_reference_and_retry_guides_from_ops_repo
     assert "| Pipeline | Suggested retry command | Runbook reference |" in body
     assert "| weekly | python -m src.main weekly-report --days 7 | [docs/runbook.md#週次パイプライン](docs/runbook.md#週次パイプライン) |" in body
     assert "| daily | python -m src.main retention | [docs/runbook.md#日次パイプライン](docs/runbook.md#日次パイプライン) |" in body
+    assert "#### Runbook anchor summary" in body
+    assert "- Anchors: #日次パイプライン, #週次パイプライン" in body
 
 
 def test_build_comment_gracefully_degrades_when_retry_guides_unavailable():
@@ -148,6 +152,30 @@ def test_build_comment_gracefully_degrades_when_retry_guides_unavailable():
 
     assert "### Runbook reference and retry guide" in body
     assert "Retry guide unavailable: `failed_command_retry_guides` was not found or was empty in `logs/ops-report-ci.json`." in body
+
+
+def test_build_comment_builds_anchor_summary_from_runbook_reference_when_anchor_missing():
+    module = _load_metrics_pr_comment_module()
+
+    payload = {
+        "days": 30,
+        "threshold_profile": "prod",
+        "violations": [],
+    }
+    ops_report_payload = {
+        "failed_command_retry_guides": [
+            {
+                "pipeline": "daily",
+                "suggested_retry_command": "python -m src.main retention",
+                "runbook_reference": "docs/runbook.md#日次パイプライン",
+            }
+        ]
+    }
+
+    body = module.build_comment(payload, ops_report_payload=ops_report_payload)
+
+    assert "#### Runbook anchor summary" in body
+    assert "- Anchors: #日次パイプライン" in body
 
 
 def test_build_comment_includes_continuous_slo_alert_section_and_comparison():

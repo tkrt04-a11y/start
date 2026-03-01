@@ -501,6 +501,7 @@ def handle_metrics_check(args: list[str]) -> bool:
     continuous_severity = str(continuous_alert.get("severity", "none")).strip().lower()
     if continuous_severity not in {"none", "warning", "critical"}:
         continuous_severity = "none"
+    has_failure = bool(violations) or continuous_severity == "critical"
 
     if "--json" in args:
         print(
@@ -551,7 +552,14 @@ def handle_metrics_check(args: list[str]) -> bool:
         else:
             print("No metric threshold violations.")
 
-    return bool(violations) or continuous_severity == "critical"
+        if has_failure:
+            print("Next actions:")
+            print(f"- Re-run with JSON: python -m src.main metrics-check --days {days} --json > metrics-check-result.json")
+            print("- Check runbook: docs/runbook.md")
+            if continuous_severity == "critical":
+                print("- Continuous SLO is critical: prioritize latest failed pipeline recovery and escalate if needed")
+
+    return has_failure
 
 
 def handle_ops_report(args: list[str]) -> None:

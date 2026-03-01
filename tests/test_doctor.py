@@ -59,3 +59,25 @@ def test_doctor_json_not_ok_with_warnings_when_fail_on_warnings_enabled(monkeypa
     assert len(payload["warnings"]) >= 1
     assert payload["fail_on_warnings"] is True
     assert payload["ok"] is False
+
+
+def test_run_doctor_reports_errors_for_invalid_pipeline_common_parameters(monkeypatch):
+    monkeypatch.setenv("ALERT_WEBHOOK_RETRIES", "0")
+    monkeypatch.setenv("ALERT_WEBHOOK_BACKOFF_SEC", "0")
+    monkeypatch.setenv("ALERT_DEDUP_COOLDOWN_SEC", "-1")
+    monkeypatch.setenv("CONNECTOR_MAX_WAIT_SEC", "-0.5")
+
+    result = doctor.run_doctor()
+
+    assert "ALERT_WEBHOOK_RETRIES must be >= 1" in result["errors"]
+    assert "ALERT_WEBHOOK_BACKOFF_SEC must be >= 0.1" in result["errors"]
+    assert "ALERT_DEDUP_COOLDOWN_SEC must be >= 0" in result["errors"]
+    assert "CONNECTOR_MAX_WAIT_SEC must be >= 0" in result["errors"]
+
+
+def test_run_doctor_reports_warning_for_invalid_alert_webhook_format(monkeypatch):
+    monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "discord")
+
+    result = doctor.run_doctor()
+
+    assert "ALERT_WEBHOOK_FORMAT should be one of: generic, slack, teams" in result["warnings"]
