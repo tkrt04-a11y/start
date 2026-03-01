@@ -322,7 +322,18 @@ def test_handle_metrics_check_json_includes_threshold_profile(monkeypatch, capsy
     monkeypatch.setattr(
         main_module,
         "check_metric_thresholds",
-        lambda days=30: {"threshold_profile": "stg", "violations": []},
+        lambda days=30: {
+            "threshold_profile": "stg",
+            "violations": [],
+            "continuous_alert": {
+                "limit": 3,
+                "warning_limit": 3,
+                "critical_limit": 5,
+                "severity": "none",
+                "active": False,
+                "violated_pipelines": [],
+            },
+        },
     )
 
     has_violations = main_module.handle_metrics_check(["--json"])
@@ -331,6 +342,7 @@ def test_handle_metrics_check_json_includes_threshold_profile(monkeypatch, capsy
 
     assert has_violations is False
     assert payload["threshold_profile"] == "stg"
+    assert payload["continuous_alert"]["severity"] == "none"
 
 
 def test_handle_metrics_check_text_includes_threshold_profile(monkeypatch, capsys):
@@ -339,7 +351,25 @@ def test_handle_metrics_check_text_includes_threshold_profile(monkeypatch, capsy
     monkeypatch.setattr(
         main_module,
         "check_metric_thresholds",
-        lambda days=30: {"threshold_profile": "dev", "violations": []},
+        lambda days=30: {
+            "threshold_profile": "dev",
+            "violations": [],
+            "continuous_alert": {
+                "limit": 3,
+                "warning_limit": 3,
+                "critical_limit": 5,
+                "severity": "warning",
+                "active": True,
+                "violated_pipelines": [
+                    {
+                        "pipeline": "weekly",
+                        "consecutive_failures": 3,
+                        "latest_run": "2026-03-01T00:00:00",
+                        "severity": "warning",
+                    }
+                ],
+            },
+        },
     )
 
     has_violations = main_module.handle_metrics_check([])
@@ -347,6 +377,39 @@ def test_handle_metrics_check_text_includes_threshold_profile(monkeypatch, capsy
 
     assert has_violations is False
     assert "Metric threshold profile: dev" in captured.out
+    assert "Continuous SLO alert severity: warning" in captured.out
+
+
+def test_handle_metrics_check_returns_true_on_critical_continuous_alert(monkeypatch, capsys):
+    from src import main as main_module
+
+    monkeypatch.setattr(
+        main_module,
+        "check_metric_thresholds",
+        lambda days=30: {
+            "threshold_profile": "prod",
+            "violations": [],
+            "continuous_alert": {
+                "limit": 3,
+                "warning_limit": 3,
+                "critical_limit": 5,
+                "severity": "critical",
+                "active": True,
+                "violated_pipelines": [
+                    {
+                        "pipeline": "daily",
+                        "consecutive_failures": 5,
+                        "latest_run": "2026-03-01T00:00:00",
+                        "severity": "critical",
+                    }
+                ],
+            },
+        },
+    )
+
+    has_violations = main_module.handle_metrics_check([])
+
+    assert has_violations is True
 
 
 def test_main_ops_report_dispatch(monkeypatch, capsys):

@@ -4,7 +4,7 @@
   "title": "Metrics Check JSON",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "days", "threshold_profile", "violations"],
+  "required": ["schema_version", "days", "threshold_profile", "violations", "continuous_alert"],
   "properties": {
     "schema_version": { "type": "string", "const": "1.1.0" },
     "days": { "type": "integer", "minimum": 0 },
@@ -29,6 +29,48 @@
           },
           "threshold": { "type": "number" },
           "observed": { "type": "number" }
+        }
+      }
+    },
+    "continuous_alert": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "limit",
+        "warning_limit",
+        "critical_limit",
+        "severity",
+        "active",
+        "violated_pipelines"
+      ],
+      "properties": {
+        "limit": { "type": "integer", "minimum": 1 },
+        "warning_limit": { "type": "integer", "minimum": 1 },
+        "critical_limit": { "type": "integer", "minimum": 1 },
+        "severity": {
+          "type": "string",
+          "enum": ["none", "warning", "critical"]
+        },
+        "active": { "type": "boolean" },
+        "violated_pipelines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pipeline", "consecutive_failures", "latest_run", "severity"],
+            "properties": {
+              "pipeline": {
+                "type": "string",
+                "enum": ["daily", "weekly", "monthly"]
+              },
+              "consecutive_failures": { "type": "integer", "minimum": 1 },
+              "latest_run": { "type": "string" },
+              "severity": {
+                "type": "string",
+                "enum": ["warning", "critical"]
+              }
+            }
+          }
         }
       }
     }

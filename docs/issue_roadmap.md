@@ -636,6 +636,52 @@
 - 完了条件:
   - DashboardでRelease/CI状況の要約が表示される。
 
+### ISSUE-068: CI失敗時のロールバック判断レポート生成
+- Priority: P1
+- Status: done
+- 背景: CI失敗時に切り戻し要否の判断材料が分散している。
+- 実装方針:
+  - 主要ステップ outcome と依存脆弱性ブロッカー有無を集約し、JSON/Markdownで判断レポートを生成・artifact化する。
+- 完了条件:
+  - CI失敗または品質ゲート違反時に `ci-rollback-decision` artifact が出力される。
+
+### ISSUE-069: 依存脆弱性差分のPR通知
+- Priority: P1
+- Status: done
+- 背景: 脆弱性の新規発生/解消がPR内で追跡しづらい。
+- 実装方針:
+  - 前回スナップショットとの差分（new/resolved）を生成し、PRコメントをupsertする。
+- 完了条件:
+  - PRで依存脆弱性差分コメントが自動更新される。
+
+### ISSUE-070: 週次失敗Issueの自動クローズ
+- Priority: P2
+- Status: done
+- 背景: 週次失敗Issueが成功後も残り、運用ノイズ化する。
+- 実装方針:
+  - 当週マーカー付きの `ops-failure` Issue を、週次workflow成功時に自動クローズする。
+- 完了条件:
+  - 同週失敗Issueが成功runで自動クローズされる。
+
+### ISSUE-071: 連続SLOアラートの段階化（warning/critical）
+- Priority: P1
+- Status: done
+- 背景: 連続違反の重大度を段階的に扱えず、通知/品質ゲート制御が粗い。
+- 実装方針:
+  - `METRIC_SLO_CONSECUTIVE_ALERT_N`（warning）と `METRIC_SLO_CONSECUTIVE_ALERT_CRITICAL_N`（critical）で段階判定。
+  - `metrics-check` 出力・週次通知・CI品質ゲートへ severity を反映する。
+- 完了条件:
+  - continuous SLO が `none|warning|critical` で判定され、critical は品質ゲート失敗になる。
+
+### ISSUE-072: Dashboard KPIトレンド（7日/30日）
+- Priority: P2
+- Status: done
+- 背景: 単一時点の指標だけでは改善/悪化トレンドを把握しづらい。
+- 実装方針:
+  - Metricsタブに 7日 vs 30日の KPI比較（Health score/Violations/Command failures/Alerts）を追加する。
+- 完了条件:
+  - Dashboardで各KPIの差分と改善/悪化判定を確認できる。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -705,6 +751,11 @@
 65. ISSUE-065
 66. ISSUE-066
 67. ISSUE-067
+68. ISSUE-068
+69. ISSUE-069
+70. ISSUE-070
+71. ISSUE-071
+72. ISSUE-072
 
 ---
 
@@ -726,3 +777,4 @@
 - 2026-03-01: ISSUE-053, 054, 055, 056, 057 を実装完了（retry環境変数化・診断要約Dashboard表示・schema version互換検証・PR再実行ガイド併記・artifact完全性結果のops取込）。
 - 2026-03-01: ISSUE-058, 059, 060, 061, 062 を実装完了（CI secret scan追加・workflow権限最小化・Release workflow追加・診断artifact再現コマンド追加・Dashboard SLO表示）。
 - 2026-03-01: ISSUE-063, 064, 065, 066, 067 を実装完了（依存脆弱性スキャンCI統合・release前提チェック・weekly失敗時Issue自動起票・連続SLO違反通知・Dashboard Release/CI健全性表示）。
+- 2026-03-01: ISSUE-068, 069, 070, 071, 072 を実装完了（CIロールバック判断artifact・依存脆弱性差分PR通知・週次失敗Issue自動クローズ・段階的SLOアラート・Dashboard KPIトレンド表示）。

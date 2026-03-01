@@ -137,6 +137,43 @@ jobs:
                 labels: ['ops-failure', 'automated'],
               });
             }
+      - name: Close weekly failure issue on success
+        if: ${{ always() && !failure() }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            function isoWeekKey(date) {
+              const utc = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+              const dayNum = utc.getUTCDay() || 7;
+              utc.setUTCDate(utc.getUTCDate() + 4 - dayNum);
+              const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+              const week = Math.ceil((((utc - yearStart) / 86400000) + 1) / 7);
+              return `${utc.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+            }
+
+            const marker = `<!-- ai-starter:weekly-failure:${isoWeekKey(new Date())} -->`;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              labels: 'ops-failure',
+              per_page: 100,
+            });
+
+            const existing = issues.find((issue) => typeof issue.body === 'string' && issue.body.includes(marker));
+            if (!existing) {
+              return;
+            }
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: existing.number,
+              state: 'closed',
+            });
       - name: Upload weekly ops report artifacts
         uses: actions/upload-artifact@v4
         with:

@@ -284,19 +284,27 @@ foreach ($cmd in $commands) {
         }
     }
 
-    if ($cmd -eq $metricsCheckCommand -and $cmdExitCode -ne 0) {
-        $continuousAlertActive = $false
-        $continuousMatch = [regex]::Match($cmdOutput, "Continuous SLO alert active:\s*(true|false)", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-        if ($continuousMatch.Success) {
-            $continuousAlertActive = $continuousMatch.Groups[1].Value.ToLowerInvariant() -eq "true"
+    if ($cmd -eq $metricsCheckCommand) {
+        $continuousSeverity = "none"
+        $severityMatch = [regex]::Match(
+            $cmdOutput,
+            "Continuous SLO alert severity:\s*(none|warning|critical)",
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        )
+        if ($severityMatch.Success) {
+            $continuousSeverity = $severityMatch.Groups[1].Value.ToLowerInvariant()
         }
 
-        if ($continuousAlertActive) {
-            $alertLine = "[$(Get-Date -Format s)] WARNING weekly pipeline: metrics-check reported continuous SLO threshold violations"
+        if ($continuousSeverity -eq "critical") {
+            $alertLine = "[$(Get-Date -Format s)] CRITICAL weekly pipeline: metrics-check reported continuous SLO critical threshold violations"
             Write-Alert -Line $alertLine -WebhookUrl $env:ALERT_WEBHOOK_URL -LogFile $logFile -AlertFile $alertFile
             $runAlerts.Add($alertLine) | Out-Null
-        } else {
-            Add-Utf8Lines -Path $logFile -Lines @("[$(Get-Date -Format s)] INFO weekly pipeline: metrics-check violation detected but continuous alert condition not met")
+        } elseif ($continuousSeverity -eq "warning") {
+            $alertLine = "[$(Get-Date -Format s)] WARNING weekly pipeline: metrics-check reported continuous SLO warning threshold violations"
+            Write-Alert -Line $alertLine -WebhookUrl $env:ALERT_WEBHOOK_URL -LogFile $logFile -AlertFile $alertFile
+            $runAlerts.Add($alertLine) | Out-Null
+        } elseif ($cmdExitCode -ne 0) {
+            Add-Utf8Lines -Path $logFile -Lines @("[$(Get-Date -Format s)] INFO weekly pipeline: metrics-check exited with violations but continuous alert severity is none")
         }
     }
 }

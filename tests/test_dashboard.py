@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from src.dashboard import (
+    _build_kpi_trend_rows,
     _build_pipeline_slo_rows,
     _collect_issue_sync_stats,
     _collect_release_ci_health,
@@ -205,6 +206,38 @@ def test_build_pipeline_slo_rows_marks_pass_and_fail() -> None:
             "gap(%)": -10.0,
             "status": "FAIL",
         },
+    ]
+
+
+def test_build_kpi_trend_rows_evaluates_improvement_and_degradation() -> None:
+    recent = {
+        "health": {
+            "score": 92,
+            "factors": {
+                "command_failures": 1,
+                "alert_count": 3,
+            },
+        },
+        "violations": [{"pipeline": "daily"}],
+    }
+    baseline = {
+        "health": {
+            "score": 88,
+            "factors": {
+                "command_failures": 3,
+                "alert_count": 3,
+            },
+        },
+        "violations": [{"pipeline": "daily"}, {"pipeline": "weekly"}],
+    }
+
+    rows = _build_kpi_trend_rows(recent, baseline)
+
+    assert rows == [
+        {"kpi": "Health score", "7d": 92.0, "30d": 88.0, "delta(7d-30d)": 4.0, "trend": "改善"},
+        {"kpi": "Violations", "7d": 1.0, "30d": 2.0, "delta(7d-30d)": -1.0, "trend": "改善"},
+        {"kpi": "Command failures", "7d": 1.0, "30d": 3.0, "delta(7d-30d)": -2.0, "trend": "改善"},
+        {"kpi": "Alerts", "7d": 3.0, "30d": 3.0, "delta(7d-30d)": 0.0, "trend": "同等"},
     ]
 
 

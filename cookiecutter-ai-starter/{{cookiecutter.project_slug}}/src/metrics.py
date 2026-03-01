@@ -57,6 +57,8 @@ _DEFAULT_THRESHOLD_PROFILE = "prod"
 _THRESHOLD_PROFILE_ENV_KEY = "METRIC_THRESHOLD_PROFILE"
 _SLO_CONSECUTIVE_ALERT_ENV_KEY = "METRIC_SLO_CONSECUTIVE_ALERT_N"
 _SLO_CONSECUTIVE_ALERT_DEFAULT = 3
+_SLO_CONSECUTIVE_ALERT_CRITICAL_ENV_KEY = "METRIC_SLO_CONSECUTIVE_ALERT_CRITICAL_N"
+_SLO_CONSECUTIVE_ALERT_CRITICAL_DEFAULT = 5
 
 _DURATION_ENV_KEYS = {
     "daily": "METRIC_MAX_DURATION_DAILY_SEC",
@@ -245,6 +247,12 @@ def evaluate_consecutive_slo_alert(
         _SLO_CONSECUTIVE_ALERT_DEFAULT,
         minimum=1,
     )
+    critical_limit = _read_positive_int_env(
+        source_env,
+        _SLO_CONSECUTIVE_ALERT_CRITICAL_ENV_KEY,
+        _SLO_CONSECUTIVE_ALERT_CRITICAL_DEFAULT,
+        minimum=consecutive_limit,
+    )
 
     now = datetime.now()
     window_start = None if days <= 0 else (now - timedelta(days=days))
@@ -275,6 +283,8 @@ def evaluate_consecutive_slo_alert(
         runs.append((timestamp, success, timestamp_text))
 
     violated_pipelines: list[dict[str, Any]] = []
+    severity_rank = {"none": 0, "warning": 1, "critical": 2}
+    overall_severity = "none"
     for pipeline in sorted(per_pipeline_runs.keys()):
         runs = sorted(per_pipeline_runs[pipeline], key=lambda item: item[0], reverse=True)
         consecutive_failures = 0
@@ -287,17 +297,24 @@ def evaluate_consecutive_slo_alert(
             consecutive_failures += 1
 
         if consecutive_failures >= consecutive_limit:
+            pipeline_severity = "critical" if consecutive_failures >= critical_limit else "warning"
+            if severity_rank[pipeline_severity] > severity_rank[overall_severity]:
+                overall_severity = pipeline_severity
             violated_pipelines.append(
                 {
                     "pipeline": pipeline,
                     "consecutive_failures": consecutive_failures,
                     "latest_run": latest_timestamp,
+                    "severity": pipeline_severity,
                 }
             )
 
     return {
         "limit": consecutive_limit,
-        "active": bool(violated_pipelines),
+        "warning_limit": consecutive_limit,
+        "critical_limit": critical_limit,
+        "severity": overall_severity,
+        "active": overall_severity != "none",
         "violated_pipelines": violated_pipelines,
     }
 

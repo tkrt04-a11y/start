@@ -498,6 +498,9 @@ def handle_metrics_check(args: list[str]) -> bool:
     violations = result.get("violations", [])
     threshold_profile = str(result.get("threshold_profile", "prod"))
     continuous_alert = result.get("continuous_alert", {}) if isinstance(result.get("continuous_alert"), dict) else {}
+    continuous_severity = str(continuous_alert.get("severity", "none")).strip().lower()
+    if continuous_severity not in {"none", "warning", "critical"}:
+        continuous_severity = "none"
 
     if "--json" in args:
         print(
@@ -507,15 +510,21 @@ def handle_metrics_check(args: list[str]) -> bool:
                     "days": days,
                     "threshold_profile": threshold_profile,
                     "violations": violations,
+                    "continuous_alert": continuous_alert,
                 },
                 ensure_ascii=False,
             )
         )
     else:
         print(f"Metric threshold profile: {threshold_profile}")
-        continuous_limit = int(continuous_alert.get("limit", 0))
+        warning_limit = int(continuous_alert.get("warning_limit", continuous_alert.get("limit", 0)))
+        critical_limit = int(continuous_alert.get("critical_limit", warning_limit))
         continuous_active = bool(continuous_alert.get("active", False))
-        print(f"Continuous SLO alert active: {str(continuous_active).lower()} (limit={continuous_limit})")
+        print(
+            "Continuous SLO alert severity: "
+            f"{continuous_severity} (warning_limit={warning_limit}, critical_limit={critical_limit})"
+        )
+        print(f"Continuous SLO alert active: {str(continuous_active).lower()}")
         if continuous_active:
             continuous_rows = continuous_alert.get("violated_pipelines", [])
             if isinstance(continuous_rows, list):
@@ -526,7 +535,11 @@ def handle_metrics_check(args: list[str]) -> bool:
                     pipeline = str(row.get("pipeline", "unknown"))
                     consecutive = int(row.get("consecutive_failures", 0))
                     latest_run = str(row.get("latest_run", ""))
-                    print(f"- pipeline={pipeline} consecutive_failures={consecutive} latest_run={latest_run}")
+                    pipeline_severity = str(row.get("severity", "warning"))
+                    print(
+                        "- pipeline="
+                        f"{pipeline} severity={pipeline_severity} consecutive_failures={consecutive} latest_run={latest_run}"
+                    )
         if violations:
             print(f"Metric threshold violations ({len(violations)}):")
             for item in violations:
@@ -538,7 +551,7 @@ def handle_metrics_check(args: list[str]) -> bool:
         else:
             print("No metric threshold violations.")
 
-    return bool(violations)
+    return bool(violations) or continuous_severity == "critical"
 
 
 def handle_ops_report(args: list[str]) -> None:

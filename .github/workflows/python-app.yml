@@ -19,7 +19,10 @@ jobs:
     env:
       DOCTOR_FAIL_ON_WARNINGS: '0'
       METRICS_CHECK_HAS_VIOLATIONS: 'false'
+      METRICS_CHECK_HAS_CRITICAL_SLO: 'false'
+      METRICS_CHECK_SLO_SEVERITY: 'none'
       DEPENDENCY_VULN_FAIL_LEVEL: 'high'
+      DEPENDENCY_VULN_HAS_BLOCKERS: 'false'
 
     steps:
       - uses: actions/checkout@v3
@@ -27,25 +30,104 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+      - name: Restore previous dependency vulnerability snapshot
+        if: always()
+        id: restore_dependency_snapshot
+        uses: actions/cache/restore@v4
+        with:
+          path: logs/dependency-vuln-ci-current.json
+          key: dependency-vuln-ci-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            dependency-vuln-ci-${{ github.ref_name }}-
+      - name: Prepare previous dependency vulnerability file
+        if: always()
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path logs -Force | Out-Null
+          if (Test-Path logs/dependency-vuln-ci-current.json) {
+            Copy-Item logs/dependency-vuln-ci-current.json logs/dependency-vuln-ci-prev.json -Force
+          }
       - name: Run secret scan
         run: |
           python scripts/ci/scan_secrets.py --format text
       - name: Install dependencies
+        id: install_dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pip-audit
       - name: Run dependency vulnerability scan
+        id: dependency_scan
+        continue-on-error: true
+        shell: pwsh
         run: |
-          python scripts/ci/check_dependency_vulnerabilities.py --format text
+          python scripts/ci/check_dependency_vulnerabilities.py --format json > logs/dependency-vuln-ci-current.json
+          $dependencyExitCode = $LASTEXITCODE
+          if ($dependencyExitCode -ne 0) {
+            "DEPENDENCY_VULN_HAS_BLOCKERS=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+      - name: Save current dependency vulnerability snapshot
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: logs/dependency-vuln-ci-current.json
+          key: dependency-vuln-ci-${{ github.ref_name }}-${{ github.run_id }}
+      - name: Build dependency vulnerability diff summary
+        if: always() && github.event_name == 'pull_request'
+        run: |
+          python scripts/ci/compare_dependency_vuln_snapshots.py --current logs/dependency-vuln-ci-current.json --previous logs/dependency-vuln-ci-prev.json --output-json logs/dependency-vuln-diff.json --output-md dependency-vuln-diff.md
+      - name: Upsert dependency vulnerability PR comment
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- ai-starter:dependency-vuln -->';
+            const bodyPath = 'dependency-vuln-diff.md';
+            if (!fs.existsSync(bodyPath)) {
+              return;
+            }
+            const body = fs.readFileSync(bodyPath, 'utf8');
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) => typeof comment.body === 'string' && comment.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
       - name: Run doctor check
+        id: doctor_check
         run: |
           python -m src.main doctor --json > doctor.json
           python -c "import json; d=json.load(open('doctor.json', encoding='utf-8')); raise SystemExit(0 if d.get('ok') else 1)"
       - name: Generate documentation
+        id: generate_docs
         run: |
           python scripts/generate_docs.py
       - name: Run tests
+        id: run_tests
         run: |
           pytest
       - name: Restore previous metrics-check snapshot
@@ -72,9 +154,18 @@ jobs:
         run: |
           python -m src.main metrics-check --days 30 --json > metrics-check-result.json
           Copy-Item metrics-check-result.json logs/metrics-check-ci-current.json -Force
-          $metricsExitCode = $LASTEXITCODE
-          if ($metricsExitCode -ne 0) {
+          $metricsPayload = Get-Content metrics-check-result.json -Raw | ConvertFrom-Json
+          $violationCount = @($metricsPayload.violations).Count
+          if ($violationCount -gt 0) {
             "METRICS_CHECK_HAS_VIOLATIONS=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          $sloSeverity = "none"
+          if ($metricsPayload.continuous_alert -and $metricsPayload.continuous_alert.severity) {
+            $sloSeverity = [string]$metricsPayload.continuous_alert.severity
+          }
+          "METRICS_CHECK_SLO_SEVERITY=$sloSeverity" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          if ($sloSeverity -eq "critical") {
+            "METRICS_CHECK_HAS_CRITICAL_SLO=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
       - name: Save current metrics-check snapshot
         if: always()
@@ -83,6 +174,7 @@ jobs:
           path: logs/metrics-check-ci-current.json
           key: metrics-check-ci-${{ github.ref_name }}-${{ github.run_id }}
       - name: Validate metrics-check JSON schema and schema_version compatibility
+        id: validate_metrics_schema
         if: always()
         run: |
           python scripts/ci/validate_json_schema.py --input metrics-check-result.json --schema docs/schemas/metrics_check.schema.json --compatibility major
@@ -133,19 +225,52 @@ jobs:
                 body,
               });
             }
-      - name: Fail job when metrics-check has violations
-        if: always() && env.METRICS_CHECK_HAS_VIOLATIONS == 'true'
+      - name: Generate CI rollback decision report
+        if: always() && (failure() || env.METRICS_CHECK_HAS_VIOLATIONS == 'true' || env.METRICS_CHECK_HAS_CRITICAL_SLO == 'true' || env.DEPENDENCY_VULN_HAS_BLOCKERS == 'true')
         shell: pwsh
         run: |
-          Write-Error 'metrics-check detected threshold violations.'
+          python scripts/ci/generate_ci_rollback_decision.py `
+            --dependency-blockers ${{ env.DEPENDENCY_VULN_HAS_BLOCKERS }} `
+            --outcome install_dependencies=${{ steps.install_dependencies.outcome }} `
+            --outcome dependency_scan=${{ steps.dependency_scan.outcome }} `
+            --outcome doctor_check=${{ steps.doctor_check.outcome }} `
+            --outcome generate_docs=${{ steps.generate_docs.outcome }} `
+            --outcome run_tests=${{ steps.run_tests.outcome }} `
+            --outcome metrics_check=${{ steps.metrics_check.outcome }} `
+            --outcome validate_metrics_schema=${{ steps.validate_metrics_schema.outcome }} `
+            --output-json logs/ci-rollback-decision.json `
+            --output-md logs/ci-rollback-decision.md
       - name: Generate ops report artifact payload
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path logs -Force | Out-Null
           python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json
       - name: Validate ops-report JSON schema and schema_version compatibility
+        id: validate_ops_schema
         run: |
           python scripts/ci/validate_json_schema.py --input logs/ops-report-ci.json --schema docs/schemas/ops_report.schema.json --compatibility major
+      - name: Upload CI rollback decision artifact
+        if: always() && (failure() || env.METRICS_CHECK_HAS_VIOLATIONS == 'true' || env.METRICS_CHECK_HAS_CRITICAL_SLO == 'true' || env.DEPENDENCY_VULN_HAS_BLOCKERS == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-rollback-decision
+          path: |
+            logs/ci-rollback-decision.json
+            logs/ci-rollback-decision.md
+          if-no-files-found: warn
+      - name: Enforce quality gates
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:DEPENDENCY_VULN_HAS_BLOCKERS -eq "true") {
+            Write-Error 'dependency vulnerability scan detected blockers.'
+          }
+          if ($env:METRICS_CHECK_HAS_VIOLATIONS -eq "true") {
+            Write-Error 'metrics-check detected threshold violations.'
+          }
+          if ($env:METRICS_CHECK_HAS_CRITICAL_SLO -eq "true") {
+            Write-Error 'metrics-check detected continuous SLO critical violations.'
+          }
       - name: Upload ops report artifact
         uses: actions/upload-artifact@v4
         with:

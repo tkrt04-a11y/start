@@ -371,6 +371,55 @@ def _build_pipeline_slo_rows(
     return rows
 
 
+def _build_kpi_trend_rows(
+    recent_result: dict[str, object],
+    baseline_result: dict[str, object],
+) -> list[dict[str, object]]:
+    def _extract_kpis(result: dict[str, object]) -> dict[str, float]:
+        health = result.get("health", {}) if isinstance(result.get("health"), dict) else {}
+        health_factors = health.get("factors", {}) if isinstance(health.get("factors"), dict) else {}
+        violations = result.get("violations", []) if isinstance(result.get("violations"), list) else []
+        return {
+            "health_score": float(_safe_int(health.get("score", 0))),
+            "violations": float(len(violations)),
+            "command_failures": float(_safe_int(health_factors.get("command_failures", 0))),
+            "alerts": float(_safe_int(health_factors.get("alert_count", 0))),
+        }
+
+    recent = _extract_kpis(recent_result)
+    baseline = _extract_kpis(baseline_result)
+    specs = [
+        ("Health score", "health_score", True),
+        ("Violations", "violations", False),
+        ("Command failures", "command_failures", False),
+        ("Alerts", "alerts", False),
+    ]
+
+    rows: list[dict[str, object]] = []
+    for label, key, higher_is_better in specs:
+        recent_value = recent.get(key, 0.0)
+        baseline_value = baseline.get(key, 0.0)
+        delta = recent_value - baseline_value
+        if abs(delta) < 1e-9:
+            trend = "同等"
+        elif (delta > 0 and higher_is_better) or (delta < 0 and not higher_is_better):
+            trend = "改善"
+        else:
+            trend = "悪化"
+
+        rows.append(
+            {
+                "kpi": label,
+                "7d": round(recent_value, 1),
+                "30d": round(baseline_value, 1),
+                "delta(7d-30d)": round(delta, 1),
+                "trend": trend,
+            }
+        )
+
+    return rows
+
+
 def _read_recent_jsonl_records(path: Path, limit: int = 2000) -> list[dict[str, object]]:
     if not path.exists():
         return []
@@ -751,6 +800,12 @@ def main() -> None:
         st.write("### Operational Health")
         health_score = int(health.get("score", 0))
         st.metric("Health score", f"{health_score}/100")
+
+        kpi_recent = check_metric_thresholds(days=7, logs_dir="logs")
+        kpi_baseline = check_metric_thresholds(days=30, logs_dir="logs")
+        trend_rows = _build_kpi_trend_rows(kpi_recent, kpi_baseline)
+        st.write("### KPIトレンド（7日 / 30日）")
+        st.table(trend_rows)
 
         health_factors = health.get("factors", {}) if isinstance(health.get("factors"), dict) else {}
         average_success_rate = float(health_factors.get("average_pipeline_success_rate", 0.0)) * 100.0

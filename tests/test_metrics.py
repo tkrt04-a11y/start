@@ -246,13 +246,50 @@ def test_evaluate_consecutive_slo_alert_detects_pipeline_streak(tmp_path):
 
     assert result["active"] is True
     assert result["limit"] == 3
+    assert result["warning_limit"] == 3
+    assert result["critical_limit"] == 5
+    assert result["severity"] == "warning"
     assert result["violated_pipelines"] == [
         {
             "pipeline": "weekly",
             "consecutive_failures": 3,
             "latest_run": now.isoformat(),
+            "severity": "warning",
         }
     ]
+
+
+def test_evaluate_consecutive_slo_alert_critical_severity(tmp_path):
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    now = datetime.now().replace(microsecond=0)
+
+    for offset in [0, 1, 2, 3, 4]:
+        _write_metric(
+            logs_dir,
+            f"daily-metrics-20260301-01010{offset}.json",
+            {
+                "pipeline": "daily",
+                "finished_at": (now - timedelta(hours=offset)).isoformat(),
+                "duration_sec": 8,
+                "command_failures": 1,
+                "alert_count": 1,
+                "success": False,
+            },
+        )
+
+    result = evaluate_consecutive_slo_alert(
+        days=30,
+        logs_dir=logs_dir,
+        env={
+            "METRIC_SLO_CONSECUTIVE_ALERT_N": "3",
+            "METRIC_SLO_CONSECUTIVE_ALERT_CRITICAL_N": "5",
+        },
+    )
+
+    assert result["active"] is True
+    assert result["severity"] == "critical"
+    assert result["violated_pipelines"][0]["severity"] == "critical"
 
 
 def test_calculate_operational_health_score_boundary_best_case():
@@ -372,6 +409,7 @@ def test_metrics_check_json_payload_conforms_schema(tmp_path):
         "days": 30,
         "threshold_profile": result["threshold_profile"],
         "violations": result["violations"],
+        "continuous_alert": result["continuous_alert"],
     }
 
     validate_json_payload(payload, _load_metrics_check_schema(), schema_name="metrics_check.schema.json")
