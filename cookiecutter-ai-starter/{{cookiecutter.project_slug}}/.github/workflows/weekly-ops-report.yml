@@ -1,0 +1,131 @@
+name: Weekly Ops Report
+
+on:
+  schedule:
+    - cron: '30 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '{{ cookiecutter.python_version }}'
+      - name: Install dependencies
+        id: install_dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Generate weekly ops report and docs index
+        id: generate_weekly_ops_report
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path logs -Force | Out-Null
+          python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json
+          Copy-Item logs/ops-report-ci.json logs/ops-report-weekly.json -Force
+          python -m src.main ops-report-index --limit 8
+      - name: Validate weekly ops-report JSON schema and schema_version compatibility
+        run: |
+          python scripts/ci/validate_json_schema.py --input logs/ops-report-ci.json --schema docs/schemas/ops_report.schema.json --compatibility major
+      - name: Verify weekly ops report artifact integrity
+        id: verify_weekly_artifacts
+        run: python scripts/ci/verify_weekly_ops_artifacts.py --json-output logs/weekly-artifact-verify.json
+      - name: Generate weekly failure diagnostic artifact
+        if: ${{ always() && failure() }}
+        shell: pwsh
+        run: |
+          python scripts/ci/generate_weekly_failure_diagnostic.py `
+            --command "python -m pip install --upgrade pip" `
+            --command "pip install -r requirements.txt" `
+            --command "python -m src.main ops-report --days 7 --json > logs/ops-report-ci.json" `
+            --command "Copy-Item logs/ops-report-ci.json logs/ops-report-weekly.json -Force" `
+            --command "python -m src.main ops-report-index --limit 8" `
+            --command "python scripts/ci/verify_weekly_ops_artifacts.py --json-output logs/weekly-artifact-verify.json" `
+            --outcome install_dependencies=${{ steps.install_dependencies.outcome }} `
+            --outcome generate_weekly_ops_report=${{ steps.generate_weekly_ops_report.outcome }} `
+            --outcome verify_weekly_artifacts=${{ steps.verify_weekly_artifacts.outcome }}
+      - name: Upload weekly failure diagnostic artifact
+        if: ${{ always() && failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-ops-failure-diagnostic
+          path: |
+            logs/weekly-ops-failure-diagnostic.md
+            logs/*.log
+            logs/ops-report-ci.json
+            logs/ops-report-weekly.json
+            logs/weekly-artifact-verify.json
+          if-no-files-found: warn
+      - name: Upload weekly ops report artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-ops-report
+          path: |
+            logs/ops-report-ci.json
+            logs/ops-report-weekly.json
+            logs/weekly-artifact-verify.json
+            docs/ops_reports/index.html
+            docs/ops_reports/latest_ops_report.md
+            docs/ops_reports/latest_ops_report.html
+            docs/ops_reports/ops-report-*.md
+            docs/ops_reports/ops-report-*.html
+          if-no-files-found: warn
+
+  deploy-pages:
+    if: github.ref == 'refs/heads/main'
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check deploy flag
+        id: deploy_flag
+        shell: bash
+        run: |
+          if [ -f .github/pages-deploy.enabled ]; then
+            echo "enabled=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=0" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Set up Python
+        if: steps.deploy_flag.outputs.enabled == '1'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '{{ cookiecutter.python_version }}'
+      - name: Install dependencies
+        if: steps.deploy_flag.outputs.enabled == '1'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Regenerate docs payload for Pages
+        if: steps.deploy_flag.outputs.enabled == '1'
+        run: |
+          mkdir -p logs
+          python -m src.main ops-report --days 7 --json > logs/ops-report-weekly.json
+          python -m src.main ops-report-index --limit 8
+      - name: Configure Pages
+        if: steps.deploy_flag.outputs.enabled == '1'
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        if: steps.deploy_flag.outputs.enabled == '1'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - name: Deploy to GitHub Pages
+        if: steps.deploy_flag.outputs.enabled == '1'
+        id: deployment
+        uses: actions/deploy-pages@v4

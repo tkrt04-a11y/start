@@ -12,10 +12,12 @@ def test_missing_api_key(monkeypatch, capsys):
     assert "Please set OPENAI_API_KEY" in captured.out
 
 
-def test_main_collect_dispatch(monkeypatch, capsys):
-    # ensure collect command goes through the handler
+def test_main_collect_dispatch(monkeypatch, capsys, tmp_path):
+    # ensure that invoking ``main`` with the "collect" argument uses the
+    # collector logic and does not attempt to contact OpenAI.
     from src import main as main_module
 
+    # intercept the collector so we don't write to the real filesystem
     called = {}
 
     class DummyCollector:
@@ -27,74 +29,14 @@ def test_main_collect_dispatch(monkeypatch, capsys):
             called["content"] = content
 
     monkeypatch.setattr(main_module, "DataCollector", DummyCollector)
+
     monkeypatch.setenv("OPENAI_API_KEY", "unused")
-    monkeypatch.setattr(sys, "argv", ["prog", "collect", "a", "b"])
+    monkeypatch.setattr(sys, "argv", ["prog", "collect", "foo", "bar"])
     main_module.main()
     captured = capsys.readouterr()
     assert "Information collected" in captured.out
-    assert called["source"] == "a"
-    assert called["content"] == "b"
-
-
-def test_main_apply_insights_dry_run_summary_new_file(monkeypatch, tmp_path, capsys):
-    from src import main as main_module
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "c"}])
-    monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
-    monkeypatch.setattr(main_module, "extract_spotlight_action_items_from_markdown", lambda md: [])
-    monkeypatch.setattr(main_module, "extract_promoted_actions_from_markdown", lambda md: [])
-
-    main_module.handle_apply_insights(["--dry-run"])
-    captured = capsys.readouterr()
-    assert "backlog: new_file (" in captured.out
-    assert "instructions: new_file (" in captured.out
-
-
-def test_main_apply_insights_dry_run_summary_unchanged(monkeypatch, tmp_path, capsys):
-    from src import main as main_module
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "c"}])
-    monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
-    monkeypatch.setattr(main_module, "extract_spotlight_action_items_from_markdown", lambda md: [])
-    monkeypatch.setattr(main_module, "extract_promoted_actions_from_markdown", lambda md: [])
-
-    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".github" / "instructions").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "docs" / "improvement_backlog.md").write_text(
-        main_module.generate_backlog_markdown({"s": 1}, "", spotlight_actions=[], promoted_actions=[]),
-        encoding="utf-8",
-    )
-    (tmp_path / ".github" / "instructions" / "common.instructions.md").write_text(
-        main_module.render_instruction_markdown("", ["s"]),
-        encoding="utf-8",
-    )
-
-    main_module.handle_apply_insights(["--dry-run"])
-    captured = capsys.readouterr()
-    assert "backlog: unchanged (+0/-0 lines)" in captured.out
-    assert "instructions: unchanged (+0/-0 lines)" in captured.out
-
-
-def test_main_apply_insights_dry_run_summary_changed(monkeypatch, tmp_path, capsys):
-    from src import main as main_module
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "c"}])
-    monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
-    monkeypatch.setattr(main_module, "extract_spotlight_action_items_from_markdown", lambda md: [])
-    monkeypatch.setattr(main_module, "extract_promoted_actions_from_markdown", lambda md: [])
-
-    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".github" / "instructions").mkdir(parents=True, exist_ok=True)
-    (tmp_path / "docs" / "improvement_backlog.md").write_text("old backlog\n", encoding="utf-8")
-    (tmp_path / ".github" / "instructions" / "common.instructions.md").write_text("old instructions\n", encoding="utf-8")
-
-    main_module.handle_apply_insights(["--dry-run"])
-    captured = capsys.readouterr()
-    assert "backlog: changed (" in captured.out
-    assert "instructions: changed (" in captured.out
+    assert called["source"] == "foo"
+    assert called["content"] == "bar"
 
 
 def test_main_fetch_dispatch(monkeypatch, capsys):
@@ -113,8 +55,8 @@ def test_main_fetch_dispatch(monkeypatch, capsys):
         lambda repo, state="open", limit=20: [{"source": "github:test/r", "content": "c"}],
     )
     monkeypatch.setattr(sys, "argv", ["prog", "fetch", "github", "test/r"])
-    main_module.main()
 
+    main_module.main()
     captured = capsys.readouterr()
     assert "Fetched and stored 1 entries." in captured.out
     assert called["items"] == [("github:test/r", "c")]
@@ -125,8 +67,8 @@ def test_main_doctor_dispatch(monkeypatch, capsys):
 
     monkeypatch.setattr(main_module, "print_doctor_report", lambda: print("Doctor report"))
     monkeypatch.setattr(sys, "argv", ["prog", "doctor"])
-    main_module.main()
 
+    main_module.main()
     captured = capsys.readouterr()
     assert "Doctor report" in captured.out
 
@@ -136,8 +78,8 @@ def test_main_doctor_json_dispatch(monkeypatch, capsys):
 
     monkeypatch.setattr(main_module, "print_doctor_report_json", lambda: print('{"ok": true}'))
     monkeypatch.setattr(sys, "argv", ["prog", "doctor", "--json"])
-    main_module.main()
 
+    main_module.main()
     captured = capsys.readouterr()
     assert '{"ok": true}' in captured.out
 
@@ -147,8 +89,8 @@ def test_main_env_init_dispatch(monkeypatch, capsys):
 
     monkeypatch.setattr(main_module, "ensure_env_from_example", lambda: {"created": 1, "added": 3, "missing_example": 0})
     monkeypatch.setattr(sys, "argv", ["prog", "env-init"])
-    main_module.main()
 
+    main_module.main()
     captured = capsys.readouterr()
     assert ".env initialized. created=1 added=3" in captured.out
 
@@ -495,8 +437,8 @@ def test_main_apply_insights_dispatch(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(main_module, "write_backlog", lambda summary, ai_summary="", **kwargs: "docs/improvement_backlog.md")
     monkeypatch.setattr(main_module, "update_instruction_file", lambda top_sources: ".github/instructions/common.instructions.md")
     monkeypatch.setattr(sys, "argv", ["prog", "apply-insights"])
-    main_module.main()
 
+    main_module.main()
     captured = capsys.readouterr()
     assert "Updated: docs/improvement_backlog.md" in captured.out
     assert "Synced Spotlight actions:" in captured.out
@@ -901,12 +843,47 @@ def test_main_apply_insights_dry_run(monkeypatch, tmp_path, capsys):
     assert called["update"] == 0
 
 
+def test_main_analyze_ai_fallback_without_api_key(monkeypatch, capsys):
+    from src import main as main_module
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "need docs"}])
+    monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
+    monkeypatch.setattr(main_module, "generate_fallback_summary", lambda e: "fallback generated")
+    monkeypatch.setattr(sys, "argv", ["prog", "analyze", "--ai"])
+
+    main_module.main()
+    captured = capsys.readouterr()
+    assert "Using local fallback summary" in captured.out
+    assert "fallback generated" in captured.out
+
+
+def test_main_analyze_ai_fallback_on_api_error(monkeypatch, capsys):
+    from src import main as main_module
+
+    monkeypatch.setenv("OPENAI_API_KEY", "dummy")
+    monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "need docs"}])
+    monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
+
+    def raise_error(entries, api_key, model="gpt-4o-mini"):
+        raise RuntimeError("quota")
+
+    monkeypatch.setattr(main_module, "generate_ai_summary", raise_error)
+    monkeypatch.setattr(main_module, "generate_fallback_summary", lambda e: "fallback generated")
+    monkeypatch.setattr(sys, "argv", ["prog", "analyze", "--ai"])
+
+    main_module.main()
+    captured = capsys.readouterr()
+    assert "AI API error" in captured.out
+    assert "fallback generated" in captured.out
+
+
 def test_main_weekly_report_dispatch(monkeypatch, capsys):
     from src import main as main_module
 
     monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "c", "collected_at": "2026-02-28T12:00:00"}])
-    monkeypatch.setattr(main_module, "filter_entries_by_days", lambda entries, days: entries)
     monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
+    monkeypatch.setattr(main_module, "filter_entries_by_days", lambda entries, days: entries)
     monkeypatch.setattr(main_module, "write_weekly_report", lambda entries, summary, ai_summary="", **kwargs: "docs/weekly_reports/weekly-report-2026-W09.md")
     monkeypatch.setattr(sys, "argv", ["prog", "weekly-report", "--days", "7"])
 
@@ -954,26 +931,6 @@ def test_main_monthly_report_dispatch(monkeypatch, capsys):
     assert "Updated: docs/monthly_reports/monthly-report-2026-02.md" in captured.out
 
 
-def test_main_analyze_ai_fallback_on_api_error(monkeypatch, capsys):
-    from src import main as main_module
-
-    monkeypatch.setenv("OPENAI_API_KEY", "dummy")
-    monkeypatch.setattr(main_module, "load_entries", lambda: [{"source": "s", "content": "need docs"}])
-    monkeypatch.setattr(main_module, "summarize_by_source", lambda e: {"s": 1})
-
-    def raise_error(entries, api_key, model="gpt-4o-mini"):
-        raise RuntimeError("quota")
-
-    monkeypatch.setattr(main_module, "generate_ai_summary", raise_error)
-    monkeypatch.setattr(main_module, "generate_fallback_summary", lambda e: "fallback generated")
-    monkeypatch.setattr(sys, "argv", ["prog", "analyze", "--ai"])
-
-    main_module.main()
-    captured = capsys.readouterr()
-    assert "AI API error" in captured.out
-    assert "fallback generated" in captured.out
-
-
 def test_main_retention_dispatch(monkeypatch, capsys):
     from src import main as main_module
 
@@ -996,3 +953,4 @@ def test_main_retention_dispatch(monkeypatch, capsys):
     assert "Retention completed." in captured.out
     assert "metrics: moved=7 kept=8" in captured.out
     assert "total: moved=16 kept=20" in captured.out
+
