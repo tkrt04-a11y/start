@@ -3,3 +3,13 @@ venv/
 __pycache__/
 *.pyc
 .env
+
+# Local generated artifacts
+logs/
+collected_data.json
+metrics-check-result.json
+docs/weekly_reports/
+docs/monthly_reports/
+docs/ops_reports/
+docs/improvement_backlog.md
+survey.json
