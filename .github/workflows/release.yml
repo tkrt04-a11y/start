@@ -46,12 +46,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate notes file
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate release preconditions
         run: |
-          if [ ! -f "${{ inputs.notes_file }}" ]; then
-            echo "Release notes file not found: ${{ inputs.notes_file }}" >&2
-            exit 1
-          fi
+          python scripts/ci/check_release_preconditions.py \
+            --tag "${{ inputs.tag }}" \
+            --notes-file "${{ inputs.notes_file }}" \
+            --target "${{ inputs.target }}" \
+            --github-ref-name "${{ github.ref_name }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

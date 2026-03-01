@@ -10,6 +10,7 @@ from src.metrics import (
     build_metrics_summary,
     calculate_operational_health_score,
     check_metric_thresholds,
+    evaluate_consecutive_slo_alert,
     load_metric_thresholds,
     normalize_health_summary,
     summarize_pipeline_metrics,
@@ -216,6 +217,42 @@ def test_check_metric_thresholds_includes_resolved_profile(tmp_path):
     )
 
     assert result["threshold_profile"] == "prod"
+
+
+def test_evaluate_consecutive_slo_alert_detects_pipeline_streak(tmp_path):
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    now = datetime.now().replace(microsecond=0)
+
+    for offset in [0, 1, 2]:
+        _write_metric(
+            logs_dir,
+            f"weekly-metrics-20260301-00000{offset}.json",
+            {
+                "pipeline": "weekly",
+                "finished_at": (now - timedelta(hours=offset)).isoformat(),
+                "duration_sec": 10,
+                "command_failures": 1,
+                "alert_count": 1,
+                "success": False,
+            },
+        )
+
+    result = evaluate_consecutive_slo_alert(
+        days=30,
+        logs_dir=logs_dir,
+        env={"METRIC_SLO_CONSECUTIVE_ALERT_N": "3"},
+    )
+
+    assert result["active"] is True
+    assert result["limit"] == 3
+    assert result["violated_pipelines"] == [
+        {
+            "pipeline": "weekly",
+            "consecutive_failures": 3,
+            "latest_run": now.isoformat(),
+        }
+    ]
 
 
 def test_calculate_operational_health_score_boundary_best_case():

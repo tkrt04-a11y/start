@@ -19,6 +19,7 @@ jobs:
     env:
       DOCTOR_FAIL_ON_WARNINGS: '0'
       METRICS_CHECK_HAS_VIOLATIONS: 'false'
+      DEPENDENCY_VULN_FAIL_LEVEL: 'high'
 
     steps:
       - uses: actions/checkout@v3
@@ -33,6 +34,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pip-audit
+      - name: Run dependency vulnerability scan
+        run: |
+          python scripts/ci/check_dependency_vulnerabilities.py --format text
       - name: Run doctor check
         run: |
           python -m src.main doctor --json > doctor.json

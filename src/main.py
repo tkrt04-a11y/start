@@ -497,6 +497,7 @@ def handle_metrics_check(args: list[str]) -> bool:
     result = check_metric_thresholds(days=days)
     violations = result.get("violations", [])
     threshold_profile = str(result.get("threshold_profile", "prod"))
+    continuous_alert = result.get("continuous_alert", {}) if isinstance(result.get("continuous_alert"), dict) else {}
 
     if "--json" in args:
         print(
@@ -512,6 +513,20 @@ def handle_metrics_check(args: list[str]) -> bool:
         )
     else:
         print(f"Metric threshold profile: {threshold_profile}")
+        continuous_limit = int(continuous_alert.get("limit", 0))
+        continuous_active = bool(continuous_alert.get("active", False))
+        print(f"Continuous SLO alert active: {str(continuous_active).lower()} (limit={continuous_limit})")
+        if continuous_active:
+            continuous_rows = continuous_alert.get("violated_pipelines", [])
+            if isinstance(continuous_rows, list):
+                print("Continuous SLO breached pipelines:")
+                for row in continuous_rows:
+                    if not isinstance(row, dict):
+                        continue
+                    pipeline = str(row.get("pipeline", "unknown"))
+                    consecutive = int(row.get("consecutive_failures", 0))
+                    latest_run = str(row.get("latest_run", ""))
+                    print(f"- pipeline={pipeline} consecutive_failures={consecutive} latest_run={latest_run}")
         if violations:
             print(f"Metric threshold violations ({len(violations)}):")
             for item in violations:

@@ -3,6 +3,7 @@ from pathlib import Path
 from src.dashboard import (
     _build_pipeline_slo_rows,
     _collect_issue_sync_stats,
+    _collect_release_ci_health,
     _load_daily_alert_summaries_from_logs,
     _parse_ops_report_markdown,
     _parse_weekly_failure_diagnostic_markdown,
@@ -205,3 +206,40 @@ def test_build_pipeline_slo_rows_marks_pass_and_fail() -> None:
             "status": "FAIL",
         },
     ]
+
+
+def test_collect_release_ci_health_reads_release_and_metrics(tmp_path: Path) -> None:
+    logs_dir = tmp_path / "logs"
+    releases_dir = tmp_path / "docs" / "releases"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    releases_dir.mkdir(parents=True, exist_ok=True)
+
+    (releases_dir / "2026-03-01-short.md").write_text("# Release 2026-03-01\n", encoding="utf-8")
+    (logs_dir / "daily-metrics-20260301-000001.json").write_text(
+        '{"pipeline":"daily","finished_at":"2026-03-01T00:00:00","success":true}',
+        encoding="utf-8",
+    )
+    (logs_dir / "weekly-ops-failure-diagnostic.md").write_text(
+        "\n".join(
+            [
+                "# Weekly Workflow Failure Diagnostic",
+                "",
+                "## Failure Reasons",
+                "- Step 'verify_weekly_artifacts' ended with outcome: failure",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = _collect_release_ci_health(logs_dir, releases_dir)
+
+    latest_release = payload.get("latest_release", {})
+    assert isinstance(latest_release, dict)
+    assert latest_release.get("name") == "Release 2026-03-01"
+
+    workflow_rows = payload.get("workflow_rows", [])
+    assert isinstance(workflow_rows, list)
+    assert any(row.get("workflow") == "日次" and row.get("latest_status") == "SUCCESS" for row in workflow_rows)
+
+    top_reasons = payload.get("top_failure_reasons", [])
+    assert top_reasons == [{"reason": "Step 'verify_weekly_artifacts' ended with outcome: failure", "count": 1}]

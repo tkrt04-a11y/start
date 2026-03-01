@@ -55,6 +55,8 @@ _DEFAULT_THRESHOLD_PROFILES = {
 
 _DEFAULT_THRESHOLD_PROFILE = "prod"
 _THRESHOLD_PROFILE_ENV_KEY = "METRIC_THRESHOLD_PROFILE"
+_SLO_CONSECUTIVE_ALERT_ENV_KEY = "METRIC_SLO_CONSECUTIVE_ALERT_N"
+_SLO_CONSECUTIVE_ALERT_DEFAULT = 3
 
 _DURATION_ENV_KEYS = {
     "daily": "METRIC_MAX_DURATION_DAILY_SEC",
@@ -98,6 +100,23 @@ def _to_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _read_positive_int_env(
+    env: Mapping[str, str],
+    key: str,
+    default: int,
+    *,
+    minimum: int = 1,
+) -> int:
+    raw = str(env.get(key, "")).strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(minimum, value)
 
 
 def _read_float_threshold(
@@ -208,6 +227,81 @@ def evaluate_metric_thresholds(
     return violations
 
 
+def evaluate_consecutive_slo_alert(
+    days: int = 30,
+    logs_dir: str | Path = "logs",
+    env: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Evaluate consecutive run failures and return alert signal.
+
+    A run with ``success=False`` is treated as one SLO violation event.
+    If a pipeline has consecutive failures greater than or equal to configured
+    threshold, the pipeline is marked for continuous alert.
+    """
+    source_env = os.environ if env is None else env
+    consecutive_limit = _read_positive_int_env(
+        source_env,
+        _SLO_CONSECUTIVE_ALERT_ENV_KEY,
+        _SLO_CONSECUTIVE_ALERT_DEFAULT,
+        minimum=1,
+    )
+
+    now = datetime.now()
+    window_start = None if days <= 0 else (now - timedelta(days=days))
+    per_pipeline_runs: dict[str, list[tuple[datetime, bool, str]]] = {}
+
+    log_path = Path(logs_dir)
+    for file_path in sorted(log_path.glob("*-metrics-*.json")):
+        try:
+            payload = json.loads(file_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        if not isinstance(payload, dict):
+            continue
+        pipeline = str(payload.get("pipeline", "")).strip().lower()
+        if pipeline not in _ALLOWED_PIPELINES:
+            continue
+
+        timestamp_text = str(payload.get("finished_at") or payload.get("started_at") or "").strip()
+        timestamp = _parse_timestamp(timestamp_text)
+        if timestamp is None:
+            continue
+        if window_start is not None and timestamp < window_start:
+            continue
+
+        success = bool(payload.get("success", False))
+        runs = per_pipeline_runs.setdefault(pipeline, [])
+        runs.append((timestamp, success, timestamp_text))
+
+    violated_pipelines: list[dict[str, Any]] = []
+    for pipeline in sorted(per_pipeline_runs.keys()):
+        runs = sorted(per_pipeline_runs[pipeline], key=lambda item: item[0], reverse=True)
+        consecutive_failures = 0
+        latest_timestamp = ""
+        for index, (_, success, timestamp_text) in enumerate(runs):
+            if index == 0:
+                latest_timestamp = timestamp_text
+            if success:
+                break
+            consecutive_failures += 1
+
+        if consecutive_failures >= consecutive_limit:
+            violated_pipelines.append(
+                {
+                    "pipeline": pipeline,
+                    "consecutive_failures": consecutive_failures,
+                    "latest_run": latest_timestamp,
+                }
+            )
+
+    return {
+        "limit": consecutive_limit,
+        "active": bool(violated_pipelines),
+        "violated_pipelines": violated_pipelines,
+    }
+
+
 def check_metric_thresholds(
     days: int = 30,
     logs_dir: str | Path = "logs",
@@ -218,12 +312,14 @@ def check_metric_thresholds(
     profile = resolve_metric_threshold_profile(env=env)
     thresholds = load_metric_thresholds(env=env)
     violations = evaluate_metric_thresholds(summary, thresholds)
+    continuous_alert = evaluate_consecutive_slo_alert(days=days, logs_dir=logs_dir, env=env)
     health = calculate_operational_health_score(summary=summary, violations=violations)
     return {
         "days": days,
         "threshold_profile": profile,
         "thresholds": thresholds,
         "violations": violations,
+        "continuous_alert": continuous_alert,
         "health": health,
         "summary": summary,
     }

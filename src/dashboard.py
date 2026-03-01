@@ -57,6 +57,110 @@ def _extract_first_int(value: str) -> int:
     return int(matched.group(0))
 
 
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.replace(tzinfo=None)
+    return parsed
+
+
+def _collect_release_ci_health(logs_dir: Path, releases_dir: Path) -> dict[str, object]:
+    latest_release = {
+        "name": "N/A",
+        "updated_at": "",
+    }
+
+    release_candidates = sorted(releases_dir.glob("*.md"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for path in release_candidates:
+        text = _safe_read_text(path)
+        heading = ""
+        for line in text.splitlines():
+            candidate = line.strip()
+            if candidate.startswith("# "):
+                heading = candidate[2:].strip()
+                break
+        latest_release = {
+            "name": heading or path.stem,
+            "updated_at": datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        break
+
+    workflow_rows: list[dict[str, object]] = []
+    for pipeline in ["daily", "weekly", "monthly"]:
+        latest_path: Path | None = None
+        latest_time = datetime.min
+        for path in logs_dir.glob(f"{pipeline}-metrics-*.json"):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            finished_text = str(payload.get("finished_at") or payload.get("started_at") or "")
+            finished_dt = _parse_timestamp(finished_text)
+            if finished_dt is None:
+                continue
+            if finished_dt >= latest_time:
+                latest_time = finished_dt
+                latest_path = path
+
+        if latest_path is None:
+            workflow_rows.append(
+                {
+                    "workflow": PIPELINE_LABELS.get(pipeline, pipeline),
+                    "latest_status": "UNKNOWN",
+                    "finished_at": "",
+                }
+            )
+            continue
+
+        try:
+            latest_payload = json.loads(latest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            latest_payload = {}
+
+        workflow_rows.append(
+            {
+                "workflow": PIPELINE_LABELS.get(pipeline, pipeline),
+                "latest_status": "SUCCESS" if bool(latest_payload.get("success", False)) else "FAILED",
+                "finished_at": str(latest_payload.get("finished_at", "")),
+            }
+        )
+
+    failure_reason_counts: dict[str, int] = {}
+    diagnostic_path = logs_dir / "weekly-ops-failure-diagnostic.md"
+    if diagnostic_path.exists():
+        parsed = _parse_weekly_failure_diagnostic_markdown(_safe_read_text(diagnostic_path))
+        reasons = parsed.get("failure_reasons", [])
+        if isinstance(reasons, list):
+            for reason in reasons:
+                reason_text = str(reason).strip()
+                if not reason_text:
+                    continue
+                failure_reason_counts[reason_text] = failure_reason_counts.get(reason_text, 0) + 1
+
+    top_failure_reasons = [
+        {"reason": key, "count": count}
+        for key, count in sorted(failure_reason_counts.items(), key=lambda item: (-item[1], item[0]))[:5]
+    ]
+
+    return {
+        "latest_release": latest_release,
+        "workflow_rows": workflow_rows,
+        "top_failure_reasons": top_failure_reasons,
+    }
+
+
 def _parse_ops_report_markdown(text: str) -> dict[str, object]:
     if not text.strip():
         return {}
@@ -618,6 +722,25 @@ def main() -> None:
         st.subheader("パイプラインメトリクス")
         metrics_days = st.number_input("対象日数（0 = 全期間）", min_value=0, max_value=3650, value=30, step=1, key="metrics_days")
         st.button("更新", key="metrics_refresh")
+
+        st.write("### Release / CI 健全性")
+        release_ci = _collect_release_ci_health(Path("logs"), Path("docs/releases"))
+        latest_release = release_ci.get("latest_release", {}) if isinstance(release_ci.get("latest_release"), dict) else {}
+        release_col1, release_col2 = st.columns(2)
+        release_col1.metric("Latest release", str(latest_release.get("name", "N/A")))
+        release_col2.metric("Release updated", str(latest_release.get("updated_at", "")))
+
+        workflow_rows = release_ci.get("workflow_rows", [])
+        if isinstance(workflow_rows, list) and workflow_rows:
+            st.write("#### 直近workflow成否")
+            st.table(workflow_rows)
+
+        top_failure_reasons = release_ci.get("top_failure_reasons", [])
+        if isinstance(top_failure_reasons, list) and top_failure_reasons:
+            st.write("#### 失敗要因トップ")
+            st.table(top_failure_reasons)
+        else:
+            st.info("失敗要因データがありません")
 
         threshold_check = check_metric_thresholds(days=int(metrics_days), logs_dir="logs")
         summary = threshold_check.get("summary", {}) if isinstance(threshold_check.get("summary"), dict) else {}

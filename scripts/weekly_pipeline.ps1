@@ -224,11 +224,13 @@ if ($today.Day -eq 1) {
     $monthlyReportCommand = "python -m src.main monthly-report --month $monthlyReportTarget --ai"
 }
 
+$metricsCheckCommand = "python -m src.main metrics-check --days 30"
+
 $commands = @(
     "python -m src.main analyze --ai",
     "python -m src.main apply-insights --ai",
     "python -m src.main weekly-report --ai",
-    "python -m src.main metrics-check --days 30",
+    $metricsCheckCommand,
     "python -m src.main ops-report --days 7",
     "python -m src.main ops-report-index --limit 8",
     "python -m src.main retention"
@@ -280,10 +282,20 @@ foreach ($cmd in $commands) {
         }
     }
 
-    if ($cmd -eq "python -m src.main metrics-check --days 30" -and $cmdExitCode -ne 0) {
-        $alertLine = "[$(Get-Date -Format s)] WARNING weekly pipeline: metrics-check reported threshold violations"
-        Write-Alert -Line $alertLine -WebhookUrl $env:ALERT_WEBHOOK_URL
-        $runAlerts.Add($alertLine) | Out-Null
+    if ($cmd -eq $metricsCheckCommand -and $cmdExitCode -ne 0) {
+        $continuousAlertActive = $false
+        $continuousMatch = [regex]::Match($cmdOutput, "Continuous SLO alert active:\s*(true|false)", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        if ($continuousMatch.Success) {
+            $continuousAlertActive = $continuousMatch.Groups[1].Value.ToLowerInvariant() -eq "true"
+        }
+
+        if ($continuousAlertActive) {
+            $alertLine = "[$(Get-Date -Format s)] WARNING weekly pipeline: metrics-check reported continuous SLO threshold violations"
+            Write-Alert -Line $alertLine -WebhookUrl $env:ALERT_WEBHOOK_URL
+            $runAlerts.Add($alertLine) | Out-Null
+        } else {
+            Add-Utf8Lines -Path $logFile -Lines @("[$(Get-Date -Format s)] INFO weekly pipeline: metrics-check violation detected but continuous alert condition not met")
+        }
     }
 }
 Add-Utf8Lines -Path $logFile -Lines @("=== Weekly pipeline finished: $(Get-Date -Format s) ===")

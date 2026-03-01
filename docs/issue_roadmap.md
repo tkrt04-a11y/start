@@ -591,6 +591,51 @@
 - 完了条件:
   - Metrics タブにSLO表と未達警告が表示される。
 
+### ISSUE-063: 依存関係の脆弱性スキャンをCI組込
+- Priority: P0
+- Status: done
+- 背景: PR/Push時に依存ライブラリ由来の脆弱性を早期検知したい。
+- 実装方針:
+  - `pip-audit` をCIで実行し、重大度しきい値 (`DEPENDENCY_VULN_FAIL_LEVEL`) 以上でfailする。
+- 完了条件:
+  - python-app workflow で依存脆弱性スキャンが実行され、しきい値以上でジョブ失敗となる。
+
+### ISSUE-064: Release workflow に前提チェック追加
+- Priority: P1
+- Status: done
+- 背景: 誤タグ/誤本文/対象不整合によるリリース事故を予防したい。
+- 実装方針:
+  - release workflow 実行前に tag重複、notes_file存在、worktree状態、target整合を検証する。
+- 完了条件:
+  - 前提チェックに失敗した場合、Release作成が実行されない。
+
+### ISSUE-065: 週次失敗時の自動Issue起票（診断付き）
+- Priority: P1
+- Status: done
+- 背景: weekly workflow失敗を見逃さず、初動調査時間を短縮したい。
+- 実装方針:
+  - failure diagnostic を本文に埋め込んだ運用Issueを自動起票し、週キーで重複抑止する。
+- 完了条件:
+  - weekly workflow 失敗時に診断付きIssueがupsertされる。
+
+### ISSUE-066: SLO違反の連続検知アラート
+- Priority: P1
+- Status: done
+- 背景: 単発違反通知のノイズを減らし、実運用で有効な警告にしたい。
+- 実装方針:
+  - メトリクス履歴から連続N回失敗を判定し、条件成立時のみ週次アラートを通知する。
+- 完了条件:
+  - `METRIC_SLO_CONSECUTIVE_ALERT_N` に応じた連続違反判定が機能し、通知がノイズ抑制される。
+
+### ISSUE-067: Dashboard に Release/CI健全性ウィジェット追加
+- Priority: P2
+- Status: done
+- 背景: リリース・ワークフロー健全性を1画面で俯瞰したい。
+- 実装方針:
+  - 最新Release、workflow直近成否、失敗要因トップをMetricsタブに表示する。
+- 完了条件:
+  - DashboardでRelease/CI状況の要約が表示される。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -655,6 +700,11 @@
 60. ISSUE-060
 61. ISSUE-061
 62. ISSUE-062
+63. ISSUE-063
+64. ISSUE-064
+65. ISSUE-065
+66. ISSUE-066
+67. ISSUE-067
 
 ---
 
@@ -675,3 +725,4 @@
 - 2026-03-01: ISSUE-048, 049, 050, 051, 052 を実装完了（runbookアンカー化・PR差分コメント・Issue Sync監視カード・失敗診断artifact・スキーマ互換性ポリシー文書化）。
 - 2026-03-01: ISSUE-053, 054, 055, 056, 057 を実装完了（retry環境変数化・診断要約Dashboard表示・schema version互換検証・PR再実行ガイド併記・artifact完全性結果のops取込）。
 - 2026-03-01: ISSUE-058, 059, 060, 061, 062 を実装完了（CI secret scan追加・workflow権限最小化・Release workflow追加・診断artifact再現コマンド追加・Dashboard SLO表示）。
+- 2026-03-01: ISSUE-063, 064, 065, 066, 067 を実装完了（依存脆弱性スキャンCI統合・release前提チェック・weekly失敗時Issue自動起票・連続SLO違反通知・Dashboard Release/CI健全性表示）。
