@@ -61,6 +61,32 @@ def _extract_health_score(payload: dict[str, Any]) -> int | None:
     return None
 
 
+def _extract_continuous_alert(payload: dict[str, Any]) -> dict[str, Any]:
+    alert = payload.get("continuous_alert", {})
+    if isinstance(alert, dict):
+        return alert
+    return {}
+
+
+def _severity_rank(value: str) -> int:
+    severity = value.strip().lower()
+    if severity == "critical":
+        return 2
+    if severity == "warning":
+        return 1
+    return 0
+
+
+def _format_severity_delta(current: str, previous: str) -> str:
+    current_rank = _severity_rank(current)
+    previous_rank = _severity_rank(previous)
+    delta = current_rank - previous_rank
+    if delta == 0:
+        return "0"
+    sign = "+" if delta > 0 else ""
+    return f"{sign}{delta}"
+
+
 def _count_violations_by_pipeline(violations: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {pipeline: 0 for pipeline in _PIPELINES}
     for item in violations:
@@ -124,6 +150,14 @@ def build_comment(
     days = int(payload.get("days", 30))
     threshold_profile = str(payload.get("threshold_profile", "prod"))
     violations = _extract_violations(payload)
+    continuous_alert = _extract_continuous_alert(payload)
+    continuous_severity = str(continuous_alert.get("severity", "none")).strip().lower()
+    continuous_active = bool(continuous_alert.get("active", False))
+    warning_limit = int(continuous_alert.get("warning_limit", continuous_alert.get("limit", 0)) or 0)
+    critical_limit = int(continuous_alert.get("critical_limit", warning_limit) or warning_limit)
+    violated_pipelines = continuous_alert.get("violated_pipelines", [])
+    if not isinstance(violated_pipelines, list):
+        violated_pipelines = []
 
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -154,6 +188,27 @@ def build_comment(
         lines.append("- Status: ✅ pass (no threshold violations)")
 
     lines.append("")
+    lines.append("### Continuous SLO alert")
+    lines.append(f"- Severity: `{continuous_severity}`")
+    lines.append(f"- Active: `{str(continuous_active).lower()}`")
+    lines.append(f"- Warning limit: `{warning_limit}`")
+    lines.append(f"- Critical limit: `{critical_limit}`")
+    if violated_pipelines:
+        lines.append("")
+        lines.append("| Pipeline | Severity | Consecutive failures | Latest run |")
+        lines.append("|---|---|---:|---|")
+        for row in violated_pipelines:
+            if not isinstance(row, dict):
+                continue
+            pipeline = str(row.get("pipeline", "unknown"))
+            pipeline_severity = str(row.get("severity", "warning"))
+            consecutive_failures = int(row.get("consecutive_failures", 0) or 0)
+            latest_run = str(row.get("latest_run", ""))
+            lines.append(f"| {pipeline} | {pipeline_severity} | {consecutive_failures} | {latest_run} |")
+    else:
+        lines.append("- Breached pipelines: (none)")
+
+    lines.append("")
     lines.append("### Comparison with previous result")
     if isinstance(previous_payload, dict):
         previous_violations = _extract_violations(previous_payload)
@@ -161,6 +216,8 @@ def build_comment(
         previous_violation_count = len(previous_violations)
         current_health_score = _extract_health_score(payload)
         previous_health_score = _extract_health_score(previous_payload)
+        previous_continuous = _extract_continuous_alert(previous_payload)
+        previous_continuous_severity = str(previous_continuous.get("severity", "none")).strip().lower()
         current_pipeline_counts = _count_violations_by_pipeline(violations)
         previous_pipeline_counts = _count_violations_by_pipeline(previous_violations)
 
@@ -176,6 +233,11 @@ def build_comment(
             "| health_score | "
             f"{_format_int_or_na(previous_health_score)} | {_format_int_or_na(current_health_score)} | "
             f"{_format_delta(current_health_score, previous_health_score)} |"
+        )
+        lines.append(
+            "| continuous_slo_severity | "
+            f"{previous_continuous_severity} | {continuous_severity} | "
+            f"{_format_severity_delta(continuous_severity, previous_continuous_severity)} |"
         )
         for pipeline in _PIPELINES:
             current_count = current_pipeline_counts.get(pipeline, 0)

@@ -148,3 +148,47 @@ def test_build_comment_gracefully_degrades_when_retry_guides_unavailable():
 
     assert "### Runbook reference and retry guide" in body
     assert "Retry guide unavailable: `failed_command_retry_guides` was not found or was empty in `logs/ops-report-ci.json`." in body
+
+
+def test_build_comment_includes_continuous_slo_alert_section_and_comparison():
+    module = _load_metrics_pr_comment_module()
+
+    payload = {
+        "days": 30,
+        "threshold_profile": "prod",
+        "violations": [],
+        "continuous_alert": {
+            "severity": "critical",
+            "active": True,
+            "warning_limit": 3,
+            "critical_limit": 5,
+            "violated_pipelines": [
+                {
+                    "pipeline": "weekly",
+                    "severity": "critical",
+                    "consecutive_failures": 5,
+                    "latest_run": "2026-03-01T09:30:00",
+                }
+            ],
+        },
+    }
+    previous_payload = {
+        "days": 30,
+        "threshold_profile": "prod",
+        "violations": [],
+        "continuous_alert": {
+            "severity": "warning",
+            "active": True,
+            "warning_limit": 3,
+            "critical_limit": 5,
+            "violated_pipelines": [],
+        },
+    }
+
+    body = module.build_comment(payload, previous_payload=previous_payload)
+
+    assert "### Continuous SLO alert" in body
+    assert "- Severity: `critical`" in body
+    assert "| Pipeline | Severity | Consecutive failures | Latest run |" in body
+    assert "| weekly | critical | 5 | 2026-03-01T09:30:00 |" in body
+    assert "| continuous_slo_severity | warning | critical | +1 |" in body

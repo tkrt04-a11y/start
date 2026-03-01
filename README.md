@@ -373,6 +373,8 @@ Issue sync の GitHub API 呼び出しは 429 / secondary rate limit を検知�
 - `METRIC_MAX_FAILURE_RATE_DAILY`: 日次 `failure_rate` 上限（0-1、既定0.10）
 - `METRIC_MAX_FAILURE_RATE_WEEKLY`: 週次 `failure_rate` 上限（0-1、既定0.20）
 - `METRIC_MAX_FAILURE_RATE_MONTHLY`: 月次 `failure_rate` 上限（0-1、既定0.25）
+- `METRIC_SLO_CONSECUTIVE_ALERT_N`: 連続失敗の warning 判定閾値（既定3）
+- `METRIC_SLO_CONSECUTIVE_ALERT_CRITICAL_N`: 連続失敗の critical 判定閾値（既定5、warning閾値以上へ補正）
 - `AUTO_SYNC_PROMOTED_ISSUES`: `1` でIssue自動起票を有効化
 - `GITHUB_REPO`: `owner/repo` 形式
 - `GITHUB_TOKEN`: GitHub API トークン

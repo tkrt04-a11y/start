@@ -682,6 +682,33 @@
 - 完了条件:
   - Dashboardで各KPIの差分と改善/悪化判定を確認できる。
 
+### ISSUE-073: metrics-check PRコメントへ continuous SLO 段階表示
+- Priority: P1
+- Status: done
+- 背景: PR上では閾値違反のみ表示され、連続SLOの重大度が把握しづらい。
+- 実装方針:
+  - metrics PRコメントに `continuous_alert` の severity/limits/違反パイプラインを表示する。
+- 完了条件:
+  - PRコメントで continuous SLO の段階情報を確認できる。
+
+### ISSUE-074: continuous SLO 段階の前回比較可視化
+- Priority: P2
+- Status: done
+- 背景: 現在値だけでは連続SLO状態の改善/悪化トレンドが判断しづらい。
+- 実装方針:
+  - metrics PRコメントの比較表に `continuous_slo_severity` 行を追加し、前回との差分を数値化する。
+- 完了条件:
+  - PRコメント比較表で severity の差分（-1/0/+1）を確認できる。
+
+### ISSUE-075: 段階的SLO設定のREADME明文化
+- Priority: P2
+- Status: done
+- 背景: `METRIC_SLO_CONSECUTIVE_ALERT_*` の運用設定がREADMEに不足している。
+- 実装方針:
+  - warning/critical 判定閾値の環境変数説明をREADMEへ追記する。
+- 完了条件:
+  - READMEだけで段階的SLO設定の方法が把握できる。
+
 ## 実施順（初期設定）
 
 1. ISSUE-001
@@ -756,6 +783,9 @@
 70. ISSUE-070
 71. ISSUE-071
 72. ISSUE-072
+73. ISSUE-073
+74. ISSUE-074
+75. ISSUE-075
 
 ---
 
@@ -778,3 +808,4 @@
 - 2026-03-01: ISSUE-058, 059, 060, 061, 062 を実装完了（CI secret scan追加・workflow権限最小化・Release workflow追加・診断artifact再現コマンド追加・Dashboard SLO表示）。
 - 2026-03-01: ISSUE-063, 064, 065, 066, 067 を実装完了（依存脆弱性スキャンCI統合・release前提チェック・weekly失敗時Issue自動起票・連続SLO違反通知・Dashboard Release/CI健全性表示）。
 - 2026-03-01: ISSUE-068, 069, 070, 071, 072 を実装完了（CIロールバック判断artifact・依存脆弱性差分PR通知・週次失敗Issue自動クローズ・段階的SLOアラート・Dashboard KPIトレンド表示）。
+- 2026-03-01: ISSUE-073, 074, 075 を実装完了（metrics PRコメントへのcontinuous SLO段階表示・severity前回比較・READMEへの段階設定追記）。
