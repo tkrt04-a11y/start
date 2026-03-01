@@ -259,7 +259,7 @@ foreach ($cmd in $commands) {
             $promotedCount = [int]$match.Groups[1].Value
             $promotedDetected = $promotedCount
         }
-        if ($promotedCount -ne $null -and $promotedCount -lt $promotedMin) {
+        if ($null -ne $promotedCount -and $promotedCount -lt $promotedMin) {
             $alertLine = "[$(Get-Date -Format s)] WARNING monthly pipeline: promoted actions below threshold ($promotedCount < $promotedMin)"
             Write-Alert -Line $alertLine -WebhookUrl $env:ALERT_WEBHOOK_URL
             $runAlerts.Add($alertLine) | Out-Null

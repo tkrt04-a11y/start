@@ -12,6 +12,17 @@ def test_missing_api_key(monkeypatch, capsys):
     assert "Please set OPENAI_API_KEY" in captured.out
 
 
+def test_main_help_flag_prints_usage(monkeypatch, capsys):
+    from src import main as main_module
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(sys, "argv", ["prog", "--help"])
+
+    main_module.main()
+    captured = capsys.readouterr()
+    assert "Usage: python -m src.main <command> [options]" in captured.out
+
+
 def test_main_collect_dispatch(monkeypatch, capsys, tmp_path):
     # ensure that invoking ``main`` with the "collect" argument uses the
     # collector logic and does not attempt to contact OpenAI.

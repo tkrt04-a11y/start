@@ -685,8 +685,19 @@ def handle_alert_dedup_prune(args: list[str]) -> None:
 
 
 def main():
+    def print_main_usage() -> None:
+        print("Usage: python -m src.main <command> [options]")
+        print(
+            "Commands: collect, analyze, fetch, apply-insights, weekly-report, monthly-report, "
+            "retention, metrics-summary, metrics-check, ops-report, ops-report-index, "
+            "alert-dedup-status, alert-dedup-reset, alert-dedup-prune, doctor, env-init"
+        )
+
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
+        if cmd in {"-h", "--help", "help"}:
+            print_main_usage()
+            return
         if cmd == "collect":
             handle_collect(sys.argv[2:])
             return
@@ -747,13 +758,12 @@ def main():
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
+        print_main_usage()
         print("Please set OPENAI_API_KEY environment variable.")
         return
 
-    client = models.get_openai_client(api_key)
-    prompt = "Say hello from AI starter kit."
-    response = client.chat.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
-    print("AI response:", response.choices[0].message.content)
+    print_main_usage()
+    print("Tip: run a concrete command above. OPENAI_API_KEY is configured.")
 
 
 if __name__ == "__main__":
