@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs/schemas/ops_report.schema.json",
+  "title": "Ops Report JSON",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at",
+    "days",
+    "window_start",
+    "total_runs",
+    "health_score",
+    "health_breakdown",
+    "pipeline_success_rates",
+    "threshold_violations_count",
+    "threshold_violations_by_pipeline",
+    "top_alert_types",
+    "daily_alert_summaries",
+    "artifact_integrity",
+    "recent_command_failures",
+    "failed_command_retry_guides"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.1.0" },
+    "generated_at": { "type": "string" },
+    "days": { "type": "integer", "minimum": 0 },
+    "window_start": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "null" }
+      ]
+    },
+    "total_runs": { "type": "integer", "minimum": 0 },
+    "health_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "health_breakdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factors", "penalties", "formula"],
+      "properties": {
+        "factors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "average_pipeline_success_rate",
+            "violation_count",
+            "command_failures",
+            "alert_count"
+          ],
+          "properties": {
+            "average_pipeline_success_rate": { "type": "number" },
+            "violation_count": { "type": "integer", "minimum": 0 },
+            "command_failures": { "type": "integer", "minimum": 0 },
+            "alert_count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "penalties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["success_rate", "violations", "command_failures", "alerts"],
+          "properties": {
+            "success_rate": { "type": "number" },
+            "violations": { "type": "number" },
+            "command_failures": { "type": "number" },
+            "alerts": { "type": "number" }
+          }
+        },
+        "formula": { "type": "string" }
+      }
+    },
+    "pipeline_success_rates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["runs", "success_rate"],
+        "properties": {
+          "runs": { "type": "integer", "minimum": 0 },
+          "success_rate": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    },
+    "threshold_violations_count": { "type": "integer", "minimum": 0 },
+    "threshold_violations_by_pipeline": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "top_alert_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "count"],
+        "properties": {
+          "type": { "type": "string" },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "daily_alert_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date", "path", "command_failures", "alert_count", "alerts"],
+        "properties": {
+          "date": { "type": "string" },
+          "path": { "type": "string" },
+          "command_failures": { "type": "integer", "minimum": 0 },
+          "alert_count": { "type": "integer", "minimum": 0 },
+          "alerts": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "artifact_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "ok_count", "missing_count", "total_count", "files"],
+      "properties": {
+        "source": { "type": "string" },
+        "ok_count": { "type": "integer", "minimum": 0 },
+        "missing_count": { "type": "integer", "minimum": 0 },
+        "total_count": { "type": "integer", "minimum": 0 },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "status"],
+            "properties": {
+              "path": { "type": "string" },
+              "status": { "type": "string", "enum": ["OK", "MISSING"] }
+            }
+          }
+        }
+      }
+    },
+    "recent_command_failures": { "type": "integer", "minimum": 0 },
+    "failed_command_retry_guides": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pipeline",
+          "failed_command",
+          "suggested_retry_command",
+          "runbook_reference",
+          "runbook_reference_anchor"
+        ],
+        "properties": {
+          "pipeline": {
+            "type": "string",
+            "enum": ["daily", "weekly", "monthly"]
+          },
+          "failed_command": { "type": "string" },
+          "suggested_retry_command": { "type": "string" },
+          "runbook_reference": { "type": "string" },
+          "runbook_reference_anchor": { "type": "string" }
+        }
+      }
+    }
+  }
+}

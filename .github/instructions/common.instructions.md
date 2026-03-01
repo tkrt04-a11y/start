@@ -21,3 +21,12 @@ Copilot や ChatGPT のチャット指示を利用する場合、
 別ファイルを同ディレクトリに作成してください。
 
 (元ネタ: Qiita『Github Copilotを標準機能の範囲で賢くしよう』)
+
+<!-- auto-insights:start -->
+## Auto Insights
+収集データから頻出した情報源（上位）:
+- github:microsoft/vscode
+- rss:https://hnrss.org/frontpage
+- manual
+- survey
+<!-- auto-insights:end -->

@@ -38,6 +38,46 @@
 <p>メインスクリプトを実行：</p>
 <pre><code class="language-sh">python -m src.main
 </code></pre>
+<h3>情報収集</h3>
+<p>収集コマンドを使って、有益な情報やアイデアを手動で記録できます。保存先は実行ディレクトリの <code>collected_data.json</code> です。</p>
+<pre><code class="language-sh"># 引数あり（source と content を指定）
+python -m src.main collect "survey" "users want simpler API"
+
+# 引数を省略すると対話形式で入力を求められます
+python -m src.main collect
+
+# 収集データを要約表示する
+python -m src.main analyze
+
+# AI 要約付き分析
+python -m src.main analyze --ai --model gpt-4o-mini
+
+# 自動収集: GitHub / RSS / Survey(JSON)
+python -m src.main fetch github microsoft/vscode open 20
+python -m src.main fetch rss https://hnrss.org/frontpage 20
+python -m src.main fetch survey-json survey.json content
+
+# 分析結果の反映
+python -m src.main apply-insights
+
+# 週次レポート
+python -m src.main weekly-report
+python -m src.main weekly-report --ai
+
+# Web UI
+streamlit run src/dashboard.py
+</code></pre>
+<p>定期実行:</p>
+<pre><code class="language-powershell"># 日次
+powershell -ExecutionPolicy Bypass -File scripts/register_daily_task.ps1
+
+# 週次（日曜 09:30）
+powershell -ExecutionPolicy Bypass -File scripts/register_weekly_task.ps1
+</code></pre>
+<h2>運用ドキュメント</h2>
+<ul>
+<li><a href="runbook.md">Runbook（障害対応プレイブック）</a></li>
+</ul>
 <h2>テスト</h2>
 <pre><code class="language-sh">pytest
 </code></pre>

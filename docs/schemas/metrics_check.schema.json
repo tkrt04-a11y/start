@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "docs/schemas/metrics_check.schema.json",
+  "title": "Metrics Check JSON",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "days", "threshold_profile", "violations"],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.1.0" },
+    "days": { "type": "integer", "minimum": 0 },
+    "threshold_profile": {
+      "type": "string",
+      "enum": ["dev", "stg", "prod"]
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pipeline", "metric", "threshold", "observed"],
+        "properties": {
+          "pipeline": {
+            "type": "string",
+            "enum": ["daily", "weekly", "monthly"]
+          },
+          "metric": {
+            "type": "string",
+            "enum": ["max_duration_sec", "failure_rate"]
+          },
+          "threshold": { "type": "number" },
+          "observed": { "type": "number" }
+        }
+      }
+    }
+  }
+}
