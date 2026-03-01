@@ -695,6 +695,8 @@ def main():
 
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
+        if cmd.startswith("-"):
+            cmd = ""
         if cmd in {"-h", "--help", "help"}:
             print_main_usage()
             return
@@ -754,6 +756,11 @@ def main():
                 print(".env.example not found.")
             else:
                 print(f".env initialized. created={result['created']} added={result['added']}")
+            return
+
+        if cmd:
+            print(f"Unknown command: {cmd}")
+            print_main_usage()
             return
 
     api_key = os.getenv("OPENAI_API_KEY")
