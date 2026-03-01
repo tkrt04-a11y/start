@@ -178,8 +178,8 @@ def test_build_ops_report_data_aggregates_metrics_alerts_and_failures(tmp_path):
     assert guides[0]["pipeline"] == "weekly"
     assert guides[0]["failed_command"] == "python -m src.main ops-report --days 7"
     assert guides[0]["suggested_retry_command"] == "python -m src.main ops-report --days 7"
-    assert guides[0]["runbook_reference"] == "docs/runbook.md#weekly-pipeline"
-    assert guides[0]["runbook_reference_anchor"] == "#weekly-pipeline"
+    assert guides[0]["runbook_reference"] == "docs/runbook.md#週次パイプライン"
+    assert guides[0]["runbook_reference_anchor"] == "#週次パイプライン"
     validate_json_payload(report, _load_ops_report_schema(), schema_name="ops_report.schema.json")
 
 
